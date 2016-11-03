@@ -119,7 +119,6 @@ class Explicit_Solver:
         dt = self._compute_local_time_step(V)
 
         control_volume = fluid.control_volume
-        #print "at begin ",30, V[30,:]
 
 
         k1[:,:] = 0
@@ -145,7 +144,6 @@ class Explicit_Solver:
         R = 1.0/2.0 * (k1 + k2)
 
 
-
         W +=  R*dt/control_volume;
 
         self._apply_wall_boundary_condition(W);
@@ -163,15 +161,12 @@ class Explicit_Solver:
 
 
     def _compute_RK_update(self, V, R):
-        #compute euler flux
-
-
 
         self._euler_flux_rhs(V, R)
-        #print "euler R", R[30,:]
+
 
         self._euler_boundary_flux(V, R)
-        #print "euler boundary R", R[30,:]
+
 
         #compute diffusion term
         if(self.equation_type == "NS"):
@@ -240,9 +235,9 @@ class Explicit_Solver:
 
             m,n,e,type = fluid.bounds[i,:]
 
-            x_m = fluid.verts[m,:]
-
             x_n = fluid.verts[n,:]
+
+            x_m = fluid.verts[m,:]
 
             prim_m = V[m,:]
 
@@ -250,7 +245,8 @@ class Explicit_Solver:
 
             dr_nm = 0.5*np.array([x_n[1] - x_m[1], x_m[0] - x_n[0]],dtype=float)
 
-            if(fluid.bc_type[type] == "free_stream"):
+
+            if(type == 2): #free_stream
 
                 W_oo = self.W_oo
 
@@ -258,7 +254,8 @@ class Explicit_Solver:
 
                 R[n,:] -= Flux._Steger_Warming(prim_n, W_oo, dr_nm, eos)
 
-            elif(fluid.bc_type[type] == "slip_wall" or fluid.bc_type[type] == "adiabatic_wall" or fluid.bc_type[type] == "isothermal_wall" ):
+            elif(type == 3): #slip_wall
+                #weakly impose slip_wall boundary condition
 
                 R[m,:] -= [0.0, prim_m[3]*dr_nm[0] , prim_m[3]*dr_nm[1], 0.0] #Flux._exact_flux(prim_m, dr_nm, eos)
 
@@ -346,13 +343,10 @@ class Explicit_Solver:
 
             n,m,e,type = fluid.bounds[i,:]
 
-            x_n = fluid.verts[n,:]
 
-            x_m = fluid.verts[m,:]
+            nx,ny = 0.5*fluid.bound_norm[i,:]
 
-            nx,ny = 0.5*np.array([x_n[1] - x_m[1], x_m[0] - x_n[0]],dtype=float)
-
-            if(fluid.bc_type[type] == "adiabatic_wall"):
+            if(type == 1): # adiabatic wall
                 vx_wall, vy_wall, q_flux = fluid.adiabatic_wall
 
                 n1,n2,n3 = fluid.elems[e,:]
@@ -368,8 +362,7 @@ class Explicit_Solver:
                 d_shape = self.shape_function_gradient[e,:,:]
 
                 d_v = np.array([  [vx1*d_shape[0,0] + vx2*d_shape[0,1] + vx3*d_shape[0,2],vx1*d_shape[1,0] + vx2*d_shape[1,1] + vx3*d_shape[1,2]]
-                                  [vy1*d_shape[0,0] + vy2*d_shape[0,1] + vy3*d_shape[0,2],vy1*d_shape[1,0] + vy2*d_shape[1,1] + vy3*d_shape[1,2]]
-                                  [ T1*d_shape[0,0] +  T2*d_shape[0,1] +  T3*d_shape[0,2], T1*d_shape[1,0] +  T2*d_shape[1,1] +  T3*d_shape[1,2]]], dtype=float)
+                                  [vy1*d_shape[0,0] + vy2*d_shape[0,1] + vy3*d_shape[0,2],vy1*d_shape[1,0] + vy2*d_shape[1,1] + vy3*d_shape[1,2]]], dtype=float)
 
                 #############################################
                 # compute viscosity, heat conductivity
@@ -406,31 +399,32 @@ class Explicit_Solver:
 
             n,m,e,type = fluid.bounds[i,:]
 
-            if(fluid.bc_type[type] == "slip_wall"):
+            if(type == 3): #slip wall
                 continue
 
 
-            if(fluid.bc_type[type] == "adiabatic_wall"):
-                W[m,3] += 0.5*W[n,0]*(fluid.adiabatic_wall[0]**2 + fluid.adiabatic_wall[1]**2 - W[m,1]**2 - W[m,2]**2)
-                W[n,3] += 0.5*W[n,0]*(fluid.adiabatic_wall[0]**2 + fluid.adiabatic_wall[1]**2 - W[n,1]**2 - W[n,2]**2)
-                W[n,1:3] = W[n,0]*fluid.adiabatic_wall[0:2]
-                W[m,1:3] = W[m,0]*fluid.adiabatic_wall[0:2]
+            if(type == 1): #adiabatic_wall
+                vx_wall, vy_wall, T_wall = fluid.bc_cond[type,:]
+                W[m,3] += 0.5*W[n,0]*(vx_wall**2 + vy_wall**2 - W[m,1]**2 - W[m,2]**2)
+                W[n,3] += 0.5*W[n,0]*(vx_wall**2 + vy_wall**2 - W[n,1]**2 - W[n,2]**2)
+                W[n,1:3] = W[n,0]*vx_wall, W[n,0]*vy_wall
+                W[m,1:3] = W[m,0]*vx_wall, W[m,0]*vy_wall
 
-            elif(fluid.bc_type[type] == "isothermal_wall"):
+            elif(type == 0): #isothermal_wall
 
+                vx_wall, vy_wall, T_wall = fluid.bc_cond[type,:]
 
+                W[n,1:3] = W[n,0]*vx_wall, W[n,0]*vy_wall
+                W[m,1:3] = W[m,0]*vx_wall, W[m,0]*vy_wall
 
-                W[n,1:3] = W[n,0]*fluid.isothermal_wall[0:2]
-                W[m,1:3] = W[m,0]*fluid.isothermal_wall[0:2]
-
-                e_wall = fluid.isothermal_wall[2] /(eos.gamma*(eos.gamma-1)) + 0.5*fluid.isothermal_wall[0]**2 + 0.5*fluid.isothermal_wall[1]**2
+                e_wall = T_wall /(eos.gamma*(eos.gamma-1)) + 0.5*vx_wall**2 + 0.5*vy_wall**2
                 W[n,3] = W[n,0]*e_wall
                 W[m,3] = W[m,0]*e_wall
 
     def _compute_local_time_step(self,V):
 
         c = np.sqrt(self.eos.gamma * V[:,3]/ V[:,0])
-        wave_speed = np.sqrt(V[:,1]**2 + V[:,2]**2) + c # + self.eos.mu
+        wave_speed = np.sqrt(V[:,1]**2 + V[:,2]**2) + c  + self.eos.mu
 
         dt = self.CFL*self.fluid_domain.min_edge/wave_speed[:,None]
 
@@ -448,19 +442,20 @@ class Explicit_Solver:
             #change the flux to the difference between the real wall state and the computed one
 
 
-            if(fluid.bc_type[type] == "adiabatic_wall" or fluid.bc_type[type] == "isothermal_wall"):
-                R[m,1] = W[m,1] - W[m,0]*fluid.adiabatic_wall[0]
-                R[m,2] = W[m,2] - W[m,0]*fluid.adiabatic_wall[1]
+            if(type == 0 or type == 1): #adiabatic wall or isothermal wall
+                vx_wall, vy_wall = fluid.bc_cond[type,0:2]
+                R[m,1] = W[m,1] - W[m,0]*vx_wall
+                R[m,2] = W[m,2] - W[m,0]*vy_wall
 
-                R[n,1] = W[n,1] - W[n,0]*fluid.adiabatic_wall[0]
-                R[n,2] = W[n,2] - W[n,0]*fluid.adiabatic_wall[1]
-
-
-
-            elif(fluid.bc_type[type] == "isothermal_wall"):
+                R[n,1] = W[n,1] - W[n,0]*vx_wall
+                R[n,2] = W[n,2] - W[n,0]*vy_wall
 
 
-                e_wall = fluid.isothermal_wall[2] /(eos.gamma*(eos.gamma-1)) + 0.5*fluid.isothermal_wall[0]**2 + 0.5*fluid.isothermal_wall[1]**2
+
+            elif(type == 0): #isothermal wall
+                vx_wall, vy_wall,T_wall = fluid.bc_cond[type,:]
+
+                e_wall = T_wall[2] /(eos.gamma*(eos.gamma-1)) + 0.5*vx_wall**2 + 0.5*vy_wall**2
                 R[m,3] = W[m,3] - W[m,0]*e_wall
                 R[n,3] = W[n,3] - W[n,0]*e_wall
 
@@ -468,8 +463,9 @@ class Explicit_Solver:
 
         if(np.isinf(self.res_L2_ref)):
 
-            self.res_L2_ref = self.res_L2 *self.tol
+            self.res_L2_ref = self.res_L2
 
+        self.res_L2 /= self.res_L2_ref
 
     def _check_solution(self,W):
 

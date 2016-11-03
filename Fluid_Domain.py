@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 import sys
 class Fluid_Domain:
     def __init__(self,fluid_input):
-        bc_file = fluid_input + ".bc"
-        self._read_boundary_file(bc_file)
+
 
         mesh = fluid_input + ".fgrid"
 
@@ -59,59 +58,80 @@ class Fluid_Domain:
         for i in xrange(self.nedges):
             edge_info[i,:] = map(int,fid.readline().split())
             self.edges[i,:] = edge_info[i,0:2]
-        self.connectivity = [[] for i in xrange(self.nverts)]
 
 
+        self.bc_map = {'isothermal_wall':0,
+                       'adiabatic_wall':1,
+                       'free_stream':2,
+                       'slip_wall':3,
+                       }
         self.nbound_type,self.nbounds = map(int,fid.readline().split())
 
-        self.bc_type = []
+
         self.bounds = np.empty(shape=[self.nbounds,4],dtype=int)
+
         bc_id = 0
         for i in xrange(self.nbound_type):
             n,bc = fid.readline().split()
-            self.bc_type.append(bc)
+            bc_type_id = self.bc_map[bc]
             for j in xrange(int(n)):
                 self.bounds[bc_id,0:3] = map(int,fid.readline().split())
-                self.bounds[bc_id,3] = i
+                self.bounds[bc_id,3] = bc_type_id
                 bc_id += 1
 
 
 
         fid.close()
 
-        self.control_volume = np.zeros(shape=[self.nverts,1],dtype=float);
-        self.area = np.zeros(shape=[self.nelems],dtype=float);
 
-        elem_center = np.zeros(shape=[self.nelems,2],dtype=float);
-        for e in xrange(self.nelems):
-            #####################################################
-            # loop all the element compute dual cell area 
-            #####################################################
-            n1,n2,n3 = self.elems[e,:]
 
-            x1,y1 = self.verts[n1,:]
+        self._read_boundary_file(fluid_input)
 
-            x2,y2 = self.verts[n2,:]
+        self._init_bound_norm()
 
-            x3,y3 = self.verts[n3,:]
+        self._init_edge_directed_area_vector(edge_info)
+        self._init_connectivity()
+        self._init_node_min_edge()
+        self._init_shape_function_gradient()
+        self._init_cell_area()
 
-            self.area[e] = e_area = 0.5*np.fabs((x2 - x1)*(y3 - y1) - (y2 - y1)*(x3 - x1))
+    def _init_bound_norm(self):
+        nbounds = self.nbounds
+        bounds= self.bounds
+        verts = self.verts
 
-            self.control_volume[n1,0] += e_area/3.0
+        self.bound_norm = np.empty(shape=[self.nbounds,2],dtype=float)
 
-            self.control_volume[n2,0] += e_area/3.0
+        for i in xrange(nbounds):
 
-            self.control_volume[n3,0] += e_area/3.0
+            n,m,e,type = bounds[i,:]
+
+            x_n = verts[n,:]
+
+            x_m = verts[m,:]
+
+            self.bound_norm[i,:] = x_m[1] - x_n[1], x_n[0] - x_m[0]
+
+    def _init_edge_directed_area_vector(self,edge_info):
+        nedges = self.nedges
+        nelems = self.nelems
+        verts = self.verts
+        elems = self.elems
+
+        self.directed_area_vector = np.zeros(shape=[nedges,2],dtype=float);
+
+        elem_center = np.zeros(shape=[nelems,2],dtype=float);
+
+        for e in xrange(nelems):
+            n1,n2,n3 = elems[e,:]
+
+            x1,y1 = verts[n1,:]
+
+            x2,y2 = verts[n2,:]
+
+            x3,y3 = verts[n3,:]
 
             elem_center[e,:] = (x1+x2+x3)/3.0,(y1+y2+y3)/3.0
-
-
-            
-        self.directed_area_vector = np.zeros(shape=[self.nedges,2],dtype=float);
-
-
-
-
 
         for i in xrange(self.nedges):
 
@@ -131,16 +151,54 @@ class Fluid_Domain:
                 self.directed_area_vector[i] += direction*(ym - yc), direction*(xc - xm)
 
 
-            self.connectivity[n1].append(n2)
-            self.connectivity[n2].append(n1)
+    def _init_connectivity(self):
+         nedges = self.nedges
+         edges = self.edges
+         nverts = self.nverts
+         self.connectivity = [[] for i in xrange(nverts)]
+         for i in xrange(nedges):
+             n1,n2 = edges[i,:]
+             self.connectivity[n1].append(n2)
+             self.connectivity[n2].append(n1)
 
 
+    def _init_cell_area(self):
+        nverts = self.nverts
+        nelems = self.nelems
+        verts = self.verts
+        elems = self.elems
 
-
-
-        self.shape_function_gradient = np.zeros(shape=[self.nelems,2,3],dtype=float);
+        self.control_volume = np.zeros(shape=[nverts,1],dtype=float);
+        self.area = np.zeros(shape=[nelems],dtype=float);
 
         for e in xrange(self.nelems):
+            #####################################################
+            # loop all the element compute dual cell area 
+            #####################################################
+            n1,n2,n3 = elems[e,:]
+
+            x1,y1 = verts[n1,:]
+
+            x2,y2 = verts[n2,:]
+
+            x3,y3 = verts[n3,:]
+
+            self.area[e] = e_area = 0.5*np.fabs((x2 - x1)*(y3 - y1) - (y2 - y1)*(x3 - x1))
+
+            self.control_volume[n1,0] += e_area/3.0
+
+            self.control_volume[n2,0] += e_area/3.0
+
+            self.control_volume[n3,0] += e_area/3.0
+
+
+    def _init_shape_function_gradient(self):
+        nelems = self.nelems
+        verts = self.verts
+        elems = self.elems
+
+        self.shape_function_gradient = np.zeros(shape=[nelems,2,3],dtype=float);
+        for e in xrange(nelems):
 
             ##################################################################
             #compute dphi_i /dx and dphi_i /dy, store in shape_shape_function
@@ -148,27 +206,31 @@ class Fluid_Domain:
             #shape_shape_function[e,:,:] = [ dphi_n1 /dx , dphi_n2 /dx  , dphi_n3 /dx
             #                                dphi_n1 /dy , dphi_n2 /dy  , dphi_n3 /dy
             #################################################################
-            n1,n2,n3 = self.elems[e,:]
+            n1,n2,n3 = elems[e,:]
 
-            x1,y1 = self.verts[n1,:]
-            x2,y2 = self.verts[n2,:]
-            x3,y3 = self.verts[n3,:]
+            x1,y1 = verts[n1,:]
+            x2,y2 = verts[n2,:]
+            x3,y3 = verts[n3,:]
 
             jac = 1.0/(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2))
             self.shape_function_gradient[e,0,:] = (y2-y3)*jac ,(y3-y1)*jac,(y1-y2)*jac
             self.shape_function_gradient[e,1,:] = (x3-x2)*jac ,(x1-x3)*jac,(x2-x1)*jac
 
+    def _init_node_min_edge(self):
+        nverts = self.nverts
+        connectivity = self.connectivity
+        verts = self.verts
 
         self.min_edge = np.empty(shape=[self.nverts,1],dtype=float)
-        for n in xrange(self.nverts):
+        for n in xrange(nverts):
 
             ##################################################################
             #compute for each node i, min_{j} ||x_i - x_j||
             #################################################################
             self.min_edge[n,0] = np.inf
-            x_n = self.verts[n,:]
-            for m in self.connectivity[n]:
-                x_m = self.verts[m,:]
+            x_n = verts[n,:]
+            for m in connectivity[n]:
+                x_m = verts[m,:]
 
                 self.min_edge[n,0] = min(self.min_edge[n,0], np.linalg.norm(x_n-x_m))
         '''
@@ -192,19 +254,22 @@ class Fluid_Domain:
             print "error for boundary edge number"
 
         '''
-    def _read_boundary_file(self,b_file):
 
-        with open(b_file) as fid:
+    def _read_boundary_file(self,fluid_input):
+        bc_file = fluid_input + ".bc"
+
+        bc_map = self.bc_map
+
+        with open(bc_file) as fid:
             for line in fid:
                 lines = line.split()
                 if(len(lines) < 2):
                     break
+                self.bc_cond = np.empty(shape =[4,3],dtype=float)
+                bc_id = bc_map[lines[0]]
 
-                if(lines[0] == "isothermal_wall"):
-                     self.isothermal_wall = np.array(map(float, lines[1:]))
-                elif(lines[0] == "adiabatic_wall"):
-                     self.adiabatic_wall = np.array(map(float, lines[1:]))
-
+                self.bc_cond[bc_id,:] = np.array(map(float, lines[1:]))
+        fid.close
 
 
 
