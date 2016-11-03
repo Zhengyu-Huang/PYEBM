@@ -6,11 +6,13 @@ def main():
     # get input parameter
     # read fluid grid & construct fluid grid data
 
-    #io_data = Io_Data("../Test/Blasius/blasius.input")
-    io_data = Io_Data("../Test/Wedge/wedge.input")
+    io_data = Io_Data("../Test/Blasius/blasius.input")
+    #io_data = Io_Data("../Test/Wedge/wedge.input")
     fluid_input = io_data.fluidmesh
 
     fluid = Fluid_Domain(fluid_input)
+    #fluid.check_mesh(True)
+
 
 
     explicit_solver = Explicit_Solver(fluid,io_data)

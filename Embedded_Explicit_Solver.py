@@ -80,7 +80,7 @@ class Explicit_Solver:
             W[i,:] = self.W_oo
 
         self._apply_wall_boundary_condition(W)
-        self.W = np.load("solutionW.npy")
+
 
 
 
@@ -183,6 +183,12 @@ class Explicit_Solver:
             b = []
             xc = fluid.verts[i,:]
             Vc = V[i,:]
+            '''
+            if(i == 5 or i==78 ):
+                print "55555"
+            if(i == 31 ):
+                print "31"
+            '''
             for neighbor in fluid.connectivity[i]:
 
                 xi = fluid.verts[neighbor]
@@ -192,7 +198,7 @@ class Explicit_Solver:
 
             A = np.array(A)
             b = np.array(b)
-
+            D = np.linalg.lstsq(A,b)[0]
             self.gradient_V[i,:,:] = np.linalg.lstsq(A,b)[0]
 
     def _euler_flux_rhs(self,V,R):
@@ -207,16 +213,32 @@ class Explicit_Solver:
 
         for i in xrange(fluid.nedges):
 
+
             n,m = fluid.edges[i,:]
+
 
             v_n,v_m = V[n,:],V[m,:]
 
+
+
+            e_nm = fluid.edge_vector[i,:]
+
             dr_nm = fluid.directed_area_vector[i,:]
 
-            dv_n,dv_m = np.dot(dr_nm,self.gradient_V[n,:,:]),np.dot(dr_nm,self.gradient_V[m,:,:])
+            dv_n,dv_m = np.dot(e_nm,self.gradient_V[n,:,:]),np.dot(e_nm,self.gradient_V[m,:,:])
+
+
 
             v_L, v_R =limiter._reconstruct(v_n, v_m, dv_n, dv_m)
 
+            if(v_L[0] < 0 or v_R[0] < 0):
+                print "reconstruct error",i,n,m,v_L,v_R
+                print v_n,v_m
+                print dv_n,dv_m
+
+            if(v_L[3] < 0 or v_R[3] < 0):
+                print "reconstruct error",i,n,m,v_L,v_R
+                print v_n,v_m
             flux = Flux._Roe_flux(v_L,v_R,dr_nm,eos)
 
 
@@ -238,6 +260,7 @@ class Explicit_Solver:
             x_n = fluid.verts[n,:]
 
             x_m = fluid.verts[m,:]
+
 
             prim_m = V[m,:]
 

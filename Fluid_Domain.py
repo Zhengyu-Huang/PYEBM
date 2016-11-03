@@ -90,6 +90,9 @@ class Fluid_Domain:
         self._init_bound_norm()
 
         self._init_edge_directed_area_vector(edge_info)
+
+        self._init_edge_vector()
+
         self._init_connectivity()
         self._init_node_min_edge()
         self._init_shape_function_gradient()
@@ -149,6 +152,23 @@ class Fluid_Domain:
                 xc,yc = elem_center[e2,:]
                 direction = np.sign((x1 - x2)*(yc - ym) - (xc - xm)*(y1 - y2))
                 self.directed_area_vector[i] += direction*(ym - yc), direction*(xc - xm)
+
+    def _init_edge_vector(self):
+        edges = self.edges
+        verts = self.verts
+        nedges = self.nedges
+
+        self.edge_vector = np.zeros(shape=[nedges,2],dtype=float);
+
+        for i in xrange(self.nedges):
+
+            n,m = edges[i,:]
+            x_n,y_n = verts[n,:]
+            x_m,y_m = verts[m,:]
+
+            self.edge_vector[i,:] = x_m-x_n, y_m-y_n
+
+
 
 
     def _init_connectivity(self):
@@ -314,24 +334,20 @@ class Fluid_Domain:
                 plt.plot([x1[0],x2[0]],[x1[1],x2[1]],color = 'r')
             for i in xrange(self.nbounds):
 
-                n1,n2, e= self.bounds[i,0:3]
+                n1,n2, e, type= self.bounds[i,:]
                 x1,x2 = self.verts[n1],self.verts[n2]
+                if(type == 0 ):
+                    plt.plot([x1[0],x2[0]],[x1[1],x2[1]], color = 'b')
+                elif(type == 1 ):
+                    plt.plot([x1[0],x2[0]],[x1[1],x2[1]], color = 'g')
+                elif(type == 2 ):
+                    plt.plot([x1[0],x2[0]],[x1[1],x2[1]], color = 'c')
+                elif(type == 3 ):
+                    plt.plot([x1[0],x2[0]],[x1[1],x2[1]], color = 'm')
 
-                plt.plot([x1[0],x2[0]],[x1[1],x2[1]], color = 'b')
-
-            for i in xrange(self.nedges):
-
-                n1,n2 = self.edges[i,:]
-
-                x1,x2 = self.verts[n1],self.verts[n2]
-
-                xc = 0.5*(x1 + x2)
-
-                xd = self.directed_area_vector[i]
-
-
-
-                plt.plot([xc[0],xd[0] + xc[0]],[xc[1],xd[1] + xc[1]], color = 'g')
+            for i in xrange(self.nverts):
+                x,y = self.verts[i,:]
+                plt.text(x,y,'%d'%i)
 
             plt.axis([-2, 2, -2, 2])
             plt.show()
