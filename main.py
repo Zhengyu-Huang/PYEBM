@@ -19,7 +19,7 @@ def main():
 
     explicit_solver._solve()
     explicit_solver._draw_solution()
-    np.save("solutionW",explicit_solver.W)
+    #np.save("solutionW",explicit_solver.W)
 
     # if it is immersed boundary problem
 

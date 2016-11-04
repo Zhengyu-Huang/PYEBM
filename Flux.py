@@ -27,7 +27,7 @@ def _wall_flux(prim_l, n_ij, eos):
 # ww_r is right conservative variables
 
 def _Roe_flux(prim_l, prim_r, n_ij, eos):
-    n_len = np.linalg.norm(n_ij)
+    n_len = np.sqrt(n_ij[0]**2 + n_ij[1]**2)
     n_ij = n_ij/n_len
     gamma = eos.gamma
 
@@ -322,9 +322,7 @@ def _Steger_Warming(prim_l, W_oo, k, eos):
 
     fm = np.dot(Q,  Dm * np.dot(Qinv,W_oo))
 
-    W_l = eos._pri_to_conser(prim_l)
 
-    fpp = np.dot(Q,  Dp * np.dot(Qinv,W_l))
 
     return fp + fm
 '''

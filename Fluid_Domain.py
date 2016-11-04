@@ -64,6 +64,7 @@ class Fluid_Domain:
                        'adiabatic_wall':1,
                        'free_stream':2,
                        'slip_wall':3,
+                       'subsonic_outflow':4,
                        }
         self.nbound_type,self.nbounds = map(int,fid.readline().split())
 

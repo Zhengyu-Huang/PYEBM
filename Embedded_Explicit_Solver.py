@@ -58,6 +58,7 @@ class Explicit_Solver:
         V_oo = np.array([1.0 , io_data.Mach*np.cos(io_data.AoA*np.pi/180.0), io_data.Mach*np.sin(io_data.AoA*np.pi/180.0) , 1/self.eos.gamma],dtype=float)
 
         self.W_oo = self.eos._pri_to_conser(V_oo)
+        self.p_oo = V_oo[-1]
 
         self.gradient_V = np.empty(shape=[fluid_domain.nverts,2,4], dtype = float)
 
@@ -80,6 +81,7 @@ class Explicit_Solver:
             W[i,:] = self.W_oo
 
         self._apply_wall_boundary_condition(W)
+        self.W = np.load("solutionW.npy")
 
 
 
@@ -177,18 +179,45 @@ class Explicit_Solver:
 
     def _lsq_gradient(self,V):
 
-        fluid = self.fluid_domain
-        for i in xrange(fluid.nverts):
+        verts = self.fluid_domain.verts
+        nverts = self.fluid_domain.nverts
+        connectivity = self.fluid_domain.connectivity
+
+        A = np.empty(shape=[2,2],dtype = float)
+        Ainv = np.empty(shape=[2,2],dtype = float)
+        b = np.empty(shape=[2,4],dtype = float)
+
+        for i in xrange(nverts):
+            A[:,:] = 0
+            b[:,:] = 0
+            xc = verts[i,:]
+            Vc = V[i,:]
+
+            for neighbor in connectivity[i]:
+
+                dx,dy = verts[neighbor] - xc
+                dV = V[neighbor] - Vc
+
+                A[0,0] += dx*dx
+                A[0,1] += dx*dy
+                A[1,1] += dy*dy
+                A[1,0] += dx*dy
+
+                b[0,:] += dx * dV
+                b[1,:] += dy * dV
+
+            det =  A[0,0]*A[1,1] - A[1,0]*A[0,1]
+            assert np.fabs(det) > 1e-16
+            Ainv[0,0],Ainv[0,1],Ainv[1,0],Ainv[1,1] = A[1,1]/det,-A[1,0]/det, -A[0,1]/det,A[0,0]/det
+
+            self.gradient_V[i,:,:] = np.dot(Ainv,b)
+
+            '''
+            for i in xrange(fluid.nverts):
             A =[]
             b = []
             xc = fluid.verts[i,:]
             Vc = V[i,:]
-            '''
-            if(i == 5 or i==78 ):
-                print "55555"
-            if(i == 31 ):
-                print "31"
-            '''
             for neighbor in fluid.connectivity[i]:
 
                 xi = fluid.verts[neighbor]
@@ -200,6 +229,7 @@ class Explicit_Solver:
             b = np.array(b)
             D = np.linalg.lstsq(A,b)[0]
             self.gradient_V[i,:,:] = np.linalg.lstsq(A,b)[0]
+            '''
 
     def _euler_flux_rhs(self,V,R):
         # convert conservative state variable W to primitive state variable V
@@ -280,9 +310,22 @@ class Explicit_Solver:
             elif(type == 3): #slip_wall
                 #weakly impose slip_wall boundary condition
 
-                R[m,:] -= [0.0, prim_m[3]*dr_nm[0] , prim_m[3]*dr_nm[1], 0.0] #Flux._exact_flux(prim_m, dr_nm, eos)
+                R[m,:] -= [0.0, prim_m[3]*dr_nm[0] , prim_m[3]*dr_nm[1], 0.0]
 
-                R[n,:] -= [0.0, prim_n[3]*dr_nm[0] , prim_n[3]*dr_nm[1], 0.0] #Flux._exact_flux(prim_n, dr_nm, eos)
+                R[n,:] -= [0.0, prim_n[3]*dr_nm[0] , prim_n[3]*dr_nm[1], 0.0]
+
+            elif(type == 4): #subsonic_outflow
+                # parameterise the outflow state by a freestream pressure rho_f
+                p_oo = self.p_oo
+
+                W_moo = np.array([prim_m[0], prim_m[0]*prim_m[1],prim_m[0]*prim_m[2], p_oo/(eos.gamma-1) + 0.5*prim_m[0]*(prim_m[1]**2 + prim_m[2]**2)],dtype=float)
+
+                W_noo = np.array([prim_n[0], prim_n[0]*prim_n[1],prim_n[0]*prim_n[2], p_oo/(eos.gamma-1) + 0.5*prim_n[0]*(prim_n[1]**2 + prim_n[2]**2)],dtype=float)
+
+
+                R[m,:] -= Flux._Steger_Warming(prim_m, W_moo, dr_nm, eos)
+
+                R[n,:] -= Flux._Steger_Warming(prim_n, W_noo, dr_nm, eos)
 
     def _viscid_flux_rhs_fem(self,V,R):
         eos = self.eos
@@ -475,12 +518,13 @@ class Explicit_Solver:
 
 
 
-            elif(type == 0): #isothermal wall
+            if(type == 0): #isothermal wall
                 vx_wall, vy_wall,T_wall = fluid.bc_cond[type,:]
 
-                e_wall = T_wall[2] /(eos.gamma*(eos.gamma-1)) + 0.5*vx_wall**2 + 0.5*vy_wall**2
+                e_wall = T_wall /(eos.gamma*(eos.gamma-1)) + 0.5*vx_wall**2 + 0.5*vy_wall**2
                 R[m,3] = W[m,3] - W[m,0]*e_wall
                 R[n,3] = W[n,3] - W[n,0]*e_wall
+
 
         self.res_L2 = np.linalg.norm(R)
 

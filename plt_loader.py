@@ -1,7 +1,8 @@
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
-mesh = "/home/icme-huang/Independence/2D_IBs_Euler-NS/TESTS/Blasius/blasius_00099.plt"
+from EOS import *
+mesh = "/home/icme-huang/FRG/2D_IBs_Euler-NS/TESTS/Blasius/blasius_00099.plt"
 
 
 
@@ -26,6 +27,20 @@ for i in xrange(n):
 for i in xrange(nelem):
     lines = fid.readline().split()
     elems[i,:] = int(lines[0]) , int(lines[1]), int(lines[2])
+
+fid.close()
+
+W_me = np.load("solutionW.npy")
+gamma = 1.4
+V_me = np.empty(shape= (n,4), dtype = float)
+V_me[:,0] = W_me[:,0]
+V_me[:,1] = W_me[:,1]/W_me[:,0]
+V_me[:,2] = W_me[:,2]/W_me[:,0]
+V_me[:,3] = (W_me[:,3] - 0.5*W_me[:,1]*V_me[:,1] - 0.5*W_me[:,2]*V_me[:,2]) * (gamma - 1.0)
+
+V = V- V_me
+
+
 elems -=1
 x , y  = verts[:,0],verts[:,1]
 rho,vx,vy,p = V[:,0],V[:,1],V[:,2],V[:,3]
