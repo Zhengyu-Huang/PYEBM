@@ -74,13 +74,13 @@ def _Roe_flux(prim_l, prim_r, n_ij, eos):
 
     #Harten's Entropy Fix JCP(1983), 49, pp357-393:
     # only for the nonlinear fields.
-    '''
+
     dws = 1.0/5.0
     if ( ws[0] < dws ):
         ws[0] = 0.50 * ( ws[0]*ws[0]/dws + dws )
     if ( ws[3] < dws ):
         ws[3] = 0.50 * ( ws[3]*ws[3]/dws + dws )
-    '''
+
 
     #compute the right characteristic eigenvectors
     P_inv = np.array([[1.0,                     0.0,           1.0,                             1.0],

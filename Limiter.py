@@ -5,7 +5,7 @@ class Limiter:
         self.type = type
     def _VA_slope_limiter(self,a,b,eps=1.0e-15):
         slope = np.empty(4,dtype=float)
-        for i in xrange(4):
+        for i in range(4):
             if(a[i]*b[i]  < 0):
                 slope[i] = 0.0
             else:

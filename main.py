@@ -1,12 +1,12 @@
 #  ##!/usr/bin/env python
-from Embedded_Explicit_Solver import *
+from Explicit_Solver import *
 from Io_Data import *
 
 def main():
     # get input parameter
     # read fluid grid & construct fluid grid data
 
-    io_data = Io_Data("../Test/Blasius/blasius.input")
+    io_data = Io_Data("../Test/NacaBF/Visc/naca.input")
     #io_data = Io_Data("../Test/Wedge/wedge.input")
     fluid_input = io_data.fluidmesh
 
@@ -19,7 +19,7 @@ def main():
 
     explicit_solver._solve()
     explicit_solver._draw_solution()
-    #np.save("solutionW",explicit_solver.W)
+    #np.save("nacaW",explicit_solver.W)
 
     # if it is immersed boundary problem
 

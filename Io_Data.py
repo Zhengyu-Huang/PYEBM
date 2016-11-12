@@ -50,7 +50,7 @@ class Io_Data():
                      self.max_ite = int(lines[1])
 
                  else:
-                     print "'%s' not recognized error in inputfile" %lines[0]
+                     print("'%s' not recognized error in inputfile" %lines[0])
 
 
 

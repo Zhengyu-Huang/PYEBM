@@ -4,7 +4,7 @@ from EOS import EOS
 import Flux
 from Fluid_Domain import *
 
-
+'''
 class Explicit_Solver:
     #gradientV: double array[:,2,4], gradient of primitive variables at each nodes
     def __init__(self,fluid_domain,io_data):
@@ -76,7 +76,7 @@ class Explicit_Solver:
 
         nverts = fluid.nverts
 
-        for i in xrange(nverts):
+        for i in range(nverts):
 
             W[i,:] = self.W_oo
 
@@ -187,7 +187,7 @@ class Explicit_Solver:
         Ainv = np.empty(shape=[2,2],dtype = float)
         b = np.empty(shape=[2,4],dtype = float)
 
-        for i in xrange(nverts):
+        for i in range(nverts):
             A[:,:] = 0
             b[:,:] = 0
             xc = verts[i,:]
@@ -212,24 +212,7 @@ class Explicit_Solver:
 
             self.gradient_V[i,:,:] = np.dot(Ainv,b)
 
-            '''
-            for i in xrange(fluid.nverts):
-            A =[]
-            b = []
-            xc = fluid.verts[i,:]
-            Vc = V[i,:]
-            for neighbor in fluid.connectivity[i]:
 
-                xi = fluid.verts[neighbor]
-                Vi = V[neighbor]
-                A.append(xi - xc)
-                b.append(Vi - Vc)
-
-            A = np.array(A)
-            b = np.array(b)
-            D = np.linalg.lstsq(A,b)[0]
-            self.gradient_V[i,:,:] = np.linalg.lstsq(A,b)[0]
-            '''
 
     def _euler_flux_rhs(self,V,R):
         # convert conservative state variable W to primitive state variable V
@@ -241,7 +224,7 @@ class Explicit_Solver:
 
         self._lsq_gradient(V)
 
-        for i in xrange(fluid.nedges):
+        for i in range(fluid.nedges):
 
 
             n,m = fluid.edges[i,:]
@@ -283,7 +266,7 @@ class Explicit_Solver:
 
         fluid = self.fluid_domain
         eos = self.eos
-        for i in xrange(fluid.nbounds):
+        for i in range(fluid.nbounds):
 
             m,n,e,type = fluid.bounds[i,:]
 
@@ -405,7 +388,7 @@ class Explicit_Solver:
 
 
 
-        for i in xrange(fluid.nbounds):
+        for i in range(fluid.nbounds):
 
             n,m,e,type = fluid.bounds[i,:]
 
@@ -461,7 +444,7 @@ class Explicit_Solver:
 
         eos = self.eos
 
-        for i in xrange(fluid.nbounds):
+        for i in range(fluid.nbounds):
 
             n,m,e,type = fluid.bounds[i,:]
 
@@ -502,7 +485,7 @@ class Explicit_Solver:
 
         eos = self.eos
 
-        for i in xrange(fluid.nbounds):
+        for i in range(fluid.nbounds):
 
             n,m,e,type = fluid.bounds[i,:]
             #change the flux to the difference between the real wall state and the computed one
@@ -619,119 +602,68 @@ class Explicit_Solver:
 #############################################################################################################################
 #############################################################################################################################
 #############################################################################################################################
-class Embedded_Explicit_Solver:
-    def __init__(self,fluid_domain,intersector,io_data):
+class Embedded_Explicit_Solver(Explicit_Solver):
+    def __init__(self,fluid_domain,io_data):
+        super().__init__(fluid_domain,io_data)
 
-        self.fluid_domain = fluid_domain
 
-        self.intersector = intersector
+        self.intersector = Intersector(self.fluid_domain,self.structure)
 
-        nverts = fluid.nverts
 
-        self.W = np.empty(shape=[nverts,4],dtype=float)
 
-        self.k1 = np.empty(shape=[nverts,4],dtype=float)
+    def _init_fluid_state(self):
 
-        self.k2 = np.empty(shape=[nverts,4],dtype=float)
+        fluid = self.fluid_domain
 
-        #####################################################
-        # construct eos
-        ####################################################
-        self.eos = eos = EOS(io_data.gamma,io_data.Prandtl)
-
-        #####################################################
-        # construct limiter
-        ####################################################
-        self.limiter = Limiter(io_data.limiter)
-
-        ####################################################
-        # equation type, Euler or NS
-        ####################################################
-        self.equation_type = io_data.equation_type
-
-        #####################################################
-        # construct non-dimensional initial state
-        #####################################################
-        # rho_oo = 1
-        # p_oo = 1/gamma
-        # u_oo = M
-        #####################################################
-
-        V_oo = np.array([1.0 , io_data.Mach*np.cos(io_data.AoA), io_data.Mach*np.sin(io_data.AoA) , 1/eos.gamma],dtype=float)
-
-        self.W_oo = eos._pri_to_conser(V_oo)
-    
-        nverts = self.fluid_domain.nverts
 
         W = self.W
 
-        for i in xrange(nverts):
+        nverts = fluid.nverts
+
+        for i in range(nverts):
+
             W[i,:] = self.W_oo
-        for i in xrange(fluid.nbounds):
 
-            m,n,type = fluid.bounds[i,:]
-
-            x_n = self.fluid_domain.verts[n,:]
-            x_m = self.fluid_domain.verts[m,:]
-
-            dr_nm = np.array([x_n[1] - x_m[1], x_m[0] - x_n[0]],dtype=float)
-            dr_nm = dr_nm/np.linalg.norm(dr_nm)
-
-            if(fluid.bc_type[type] == "slip_wall"):
-
-                v_m = eos._conser_to_prim(W[m,:])
-
-                v_m[1:3] -= np.dot(v_m[1:3]*dr_nm) * dr_nm
-
-                W[m,:] = eos._prim_to_conser(v_m)
-
-                v_n = eos._conser_to_prim(W[n,:])
-
-                v_n[1:3] -= np.dot(v_n[1:3]*dr_nm) * dr_nm
-
-                W[n,:] = eos._prim_to_conser(v_n)
+        self._apply_wall_boundary_condition(W)
+        self.W = np.load("solutionW.npy")
 
 
+    def _lsq_gradient(self,V,status):
+
+        verts = self.fluid_domain.verts
+        nverts = self.fluid_domain.nverts
 
 
-
-    def _steady_time_advance(self):
-
-
-        W, k1, k2 = self.W,  self.k1, self.k2
-
-        eos = self.eos
-
-        V=np.empty(shape=[fluid.nverts,4],dtype=float)
-
-        eos._conser_to_pri_all(W,V)
-
-        dt = self._compute_time_step(V,eos)
-
-        control_volume = self.fluid_domain.control_volume
-
-        k1[:,:] = 0
-
-        self._compute_RK_update(W, k1);
+        A = np.empty(shape=[2,2],dtype = float)
+        Ainv = np.empty(shape=[2,2],dtype = float)
+        b = np.empty(shape=[2,4],dtype = float)
+        #todo build connectivity
 
 
+        for i in range(nverts):
+            A[:,:] = 0
+            b[:,:] = 0
+            xc = verts[i,:]
+            Vc = V[i,:]
 
-        W0 = W + k1*dt/control_volume;
+            for neighbor in connectivity[i]:
 
-        self._apply_wall_boundary_condition(W0);
+                dx,dy = verts[neighbor] - xc
+                dV = V[neighbor] - Vc
 
-        self._check_solution(W0);
+                A[0,0] += dx*dx
+                A[0,1] += dx*dy
+                A[1,1] += dy*dy
+                A[1,0] += dx*dy
 
-        k2[:,:] = 0
+                b[0,:] += dx * dV
+                b[1,:] += dy * dV
 
-        self._compute_RK_update(W0, k2);
+            det =  A[0,0]*A[1,1] - A[1,0]*A[0,1]
+            assert np.fabs(det) > 1e-16
+            Ainv[0,0],Ainv[0,1],Ainv[1,0],Ainv[1,1] = A[1,1]/det,-A[1,0]/det, -A[0,1]/det,A[0,0]/det
 
-        W +=  1.0/2.0 * (k1 + k2)*dt/control_volume;
-
-
-        self._apply_wall_boundary_condition(W);
-
-        self.check_solution(W);
+            self.gradient_V[i,:,:] = np.dot(Ainv,b)
 
 
 
@@ -741,13 +673,6 @@ class Embedded_Explicit_Solver:
 
 
 
-
-    def _compute_RK_update(self, V, R):
-        #compute euler flux
-
-        self._euler_flux_rhs(V, R)
-
-        self._euler_boundary_flux(V, R)
 
 
 
@@ -763,23 +688,35 @@ class Embedded_Explicit_Solver:
         # convert conservative state variable W to primitive state variable V
 
         fluid = self.fluid_domain
+
         status = self.intersector.status
+
         intersect_or_not = self.intersector.intersect_or_not
+
         limiter = self.limiter
+
         eos = self.eos
 
-        fluid._lsq_gradient(status)
+        self._lsq_gradient(V,status)
 
 
 
 
-        for i in xrange(fluid.nedges):
+        for i in range(fluid.nedges):
             n,m = fluid.edges[i,:]
+
             v_n,v_m = V[n,:],V[m,:]
+
             n_active,m_active = status[n],status[m]
+
             intersect = intersect_or_not[i]
-            dr_nm = fluid.edge_norm[i,:]
-            dv_n,dv_m = np.dot(dr_nm,fluid.gradient_V[n,:,:]),np.dot(dr_nm,fluid.gradient_V[m,:,:])
+
+            e_nm = fluid.edge_vector[i,:]
+
+            dr_nm = fluid.directed_area_vector[i,:]
+
+            dv_n,dv_m = np.dot(e_nm,self.gradient_V[n,:,:]),np.dot(e_nm,self.gradient_V[m,:,:])
+
             if(n_active and m_active and not intersect):
 
                 v_L, v_R =limiter._reconstruct(v_n, v_m, dv_n, dv_m)
@@ -790,7 +727,7 @@ class Embedded_Explicit_Solver:
             elif(m_active and not n_active):
                 v_R = v_m + 0.5*dv_m
                 v_L = self.SIV(i,self.intersector)
-            flux = _Roe_flux(v_L,v_R,dr_nm,eos)
+            flux = Flux._Roe_flux(v_L,v_R,dr_nm,eos)
 
             R[n,:] -= flux
             R[m,:] += flux
@@ -802,14 +739,22 @@ class Embedded_Explicit_Solver:
     def _euler_boundary_flux(self,V,R):
 
         fluid = self.fluid_domain
-        eos = self.eos
-        for i in xrange(fluid.nbounds):
 
-            m,n,type = fluid.bounds[i,:]
+        eos = self.eos
+
+        status = self.intersector.status
+
+        for i in range(fluid.nbounds):
+
+            m,n,e,type = fluid.bounds[i,:]
+
+            x_n = fluid.verts[n,:]
 
             x_m = fluid.verts[m,:]
 
-            x_n = fluid.verts[n,:]
+            status_m = status[m]
+
+            status_n = status[n]
 
             prim_m = V[m,:]
 
@@ -817,19 +762,37 @@ class Embedded_Explicit_Solver:
 
             dr_nm = 0.5*np.array([x_n[1] - x_m[1], x_m[0] - x_n[0]],dtype=float)
 
-            if(fluid.bc_type[type] == "free_stream"):
 
-                W_oo = fluid.free_stream
+            if(type == 2): #free_stream
 
-                R[m,:] -= _Steger_Warming(prim_m, W_oo, dr_nm, eos)
+                W_oo = self.W_oo
 
-                R[n,:] -= _Steger_Warming(prim_n, W_oo, dr_nm, eos)
+                if(status_m):
+                    R[m,:] -= Flux._Steger_Warming(prim_m, W_oo, dr_nm, eos)
+                if(status_n):
 
-            elif(fluid.bc_type[type] == "slip_wall"):
+                    R[n,:] -= Flux._Steger_Warming(prim_n, W_oo, dr_nm, eos)
 
-                R[m,:] -= _exact_flux(prim_m, dr_nm, eos)
+            elif(type == 3): #slip_wall
+                #weakly impose slip_wall boundary condition
+                if(status_m):
+                    R[m,:] -= [0.0, prim_m[3]*dr_nm[0] , prim_m[3]*dr_nm[1], 0.0]
+                if(status_n):
+                    R[n,:] -= [0.0, prim_n[3]*dr_nm[0] , prim_n[3]*dr_nm[1], 0.0]
 
-                R[n,:] -= _exact_flux(prim_n, dr_nm, eos)
+            elif(type == 4): #subsonic_outflow
+                # parameterise the outflow state by a freestream pressure rho_f
+                p_oo = self.p_oo
+                if(status_m):
+                    W_moo = np.array([prim_m[0], prim_m[0]*prim_m[1],prim_m[0]*prim_m[2], p_oo/(eos.gamma-1) + 0.5*prim_m[0]*(prim_m[1]**2 + prim_m[2]**2)],dtype=float)
+
+                    R[m,:] -= Flux._Steger_Warming(prim_m, W_moo, dr_nm, eos)
+                if(status_n):
+
+                    W_noo = np.array([prim_n[0], prim_n[0]*prim_n[1],prim_n[0]*prim_n[2], p_oo/(eos.gamma-1) + 0.5*prim_n[0]*(prim_n[1]**2 + prim_n[2]**2)],dtype=float)
+
+                    R[n,:] -= Flux._Steger_Warming(prim_n, W_noo, dr_nm, eos)
+
 
 
 
@@ -841,7 +804,7 @@ class Embedded_Explicit_Solver:
         return ;
 
     def _viscid_flux_rhs_fem(self):
-        #for e in xrange()
+        #for e in range()
         #    check element e valid
         return ;
 
@@ -899,4 +862,3 @@ class Embedded_Explicit_Solver:
 
     def _apply_wall_boundary_condition(self,W):
         return ;
-'''

@@ -45,18 +45,18 @@ class Fluid_Domain:
         ####################################################################################################
         self.nverts = int(fid.readline())
         self.verts = np.empty(shape=[self.nverts,2],dtype=float)
-        for i in xrange(self.nverts):
-            self.verts[i,:] = map(float,fid.readline().split())
+        for i in range(self.nverts):
+            self.verts[i,:] = [float(x) for x in fid.readline().split()]
         self.nelems = int(fid.readline())
         self.elems = np.empty(shape=[self.nelems,3],dtype=int)
-        for i in xrange(self.nelems):
-            self.elems[i,:] = map(int,fid.readline().split())
+        for i in range(self.nelems):
+            self.elems[i,:] = [int(x) for x in fid.readline().split()]
 
         self.nedges = int(fid.readline())
         edge_info = np.empty(shape=[self.nedges,4],dtype=int)
         self.edges = np.empty(shape=[self.nedges,2],dtype=int)
-        for i in xrange(self.nedges):
-            edge_info[i,:] = map(int,fid.readline().split())
+        for i in range(self.nedges):
+            edge_info[i,:] = [int(x) for x in fid.readline().split()]
             self.edges[i,:] = edge_info[i,0:2]
 
 
@@ -66,17 +66,17 @@ class Fluid_Domain:
                        'slip_wall':3,
                        'subsonic_outflow':4,
                        }
-        self.nbound_type,self.nbounds = map(int,fid.readline().split())
+        self.nbound_type,self.nbounds = [int(x) for x in fid.readline().split()]
 
 
         self.bounds = np.empty(shape=[self.nbounds,4],dtype=int)
 
         bc_id = 0
-        for i in xrange(self.nbound_type):
+        for i in range(self.nbound_type):
             n,bc = fid.readline().split()
             bc_type_id = self.bc_map[bc]
-            for j in xrange(int(n)):
-                self.bounds[bc_id,0:3] = map(int,fid.readline().split())
+            for j in range(int(n)):
+                self.bounds[bc_id,0:3] = [int(x) for x in fid.readline().split()]
                 self.bounds[bc_id,3] = bc_type_id
                 bc_id += 1
 
@@ -106,7 +106,7 @@ class Fluid_Domain:
 
         self.bound_norm = np.empty(shape=[self.nbounds,2],dtype=float)
 
-        for i in xrange(nbounds):
+        for i in range(nbounds):
 
             n,m,e,type = bounds[i,:]
 
@@ -126,7 +126,7 @@ class Fluid_Domain:
 
         elem_center = np.zeros(shape=[nelems,2],dtype=float);
 
-        for e in xrange(nelems):
+        for e in range(nelems):
             n1,n2,n3 = elems[e,:]
 
             x1,y1 = verts[n1,:]
@@ -137,7 +137,7 @@ class Fluid_Domain:
 
             elem_center[e,:] = (x1+x2+x3)/3.0,(y1+y2+y3)/3.0
 
-        for i in xrange(self.nedges):
+        for i in range(self.nedges):
 
             n1,n2,e1,e2 = edge_info[i,:]
             x1,y1 = self.verts[n1,:]
@@ -161,7 +161,7 @@ class Fluid_Domain:
 
         self.edge_vector = np.zeros(shape=[nedges,2],dtype=float);
 
-        for i in xrange(self.nedges):
+        for i in range(self.nedges):
 
             n,m = edges[i,:]
             x_n,y_n = verts[n,:]
@@ -176,8 +176,8 @@ class Fluid_Domain:
          nedges = self.nedges
          edges = self.edges
          nverts = self.nverts
-         self.connectivity = [[] for i in xrange(nverts)]
-         for i in xrange(nedges):
+         self.connectivity = [[] for i in range(nverts)]
+         for i in range(nedges):
              n1,n2 = edges[i,:]
              self.connectivity[n1].append(n2)
              self.connectivity[n2].append(n1)
@@ -192,7 +192,7 @@ class Fluid_Domain:
         self.control_volume = np.zeros(shape=[nverts,1],dtype=float);
         self.area = np.zeros(shape=[nelems],dtype=float);
 
-        for e in xrange(self.nelems):
+        for e in range(self.nelems):
             #####################################################
             # loop all the element compute dual cell area 
             #####################################################
@@ -219,7 +219,7 @@ class Fluid_Domain:
         elems = self.elems
 
         self.shape_function_gradient = np.zeros(shape=[nelems,2,3],dtype=float);
-        for e in xrange(nelems):
+        for e in range(nelems):
 
             ##################################################################
             #compute dphi_i /dx and dphi_i /dy, store in shape_shape_function
@@ -243,7 +243,7 @@ class Fluid_Domain:
         verts = self.verts
 
         self.min_edge = np.empty(shape=[self.nverts,1],dtype=float)
-        for n in xrange(nverts):
+        for n in range(nverts):
 
             ##################################################################
             #compute for each node i, min_{j} ||x_i - x_j||
@@ -259,7 +259,7 @@ class Fluid_Domain:
         # check edge_info
         ##############
         boundary_edge_number = 0
-        for i in xrange(self.nedges):
+        for i in range(self.nedges):
             n,m,e1,e2 = edge_info[i,:]
             n1,n2,n3 = self.elems[e1,:]
             if((n != n1 and n !=n2 and n!= n3) or (m != n1 and m !=n2 and m!= n3)):
@@ -289,7 +289,7 @@ class Fluid_Domain:
                 self.bc_cond = np.empty(shape =[4,3],dtype=float)
                 bc_id = bc_map[lines[0]]
 
-                self.bc_cond[bc_id,:] = np.array(map(float, lines[1:]))
+                self.bc_cond[bc_id,:] = np.array([float(x) for x in lines[1:]])
         fid.close
 
 
@@ -303,37 +303,37 @@ class Fluid_Domain:
 
 
         #check boundary edges elements relation, and boundary edges orientation
-        for i in xrange(self.nbounds):
+        for i in range(self.nbounds):
             n,m,e = self.bounds[i,0:3]
             n1,n2,n3 = self.elems[e,:]
             if((n != n1 and n !=n2 and n!= n3) or (m != n1 and m !=n2 and m!= n3)):
-                print "error for boundary edge %d" %i
+                print("error for boundary edge %d" %i)
             l = n1 + n2 + n3 - n - m
             vec_12 = self.verts[n,:] - self.verts[l,:]
             vec_13 = self.verts[m,:] - self.verts[l,:]
             if(vec_12[0]*vec_13[1] - vec_12[1]*vec_13[0] <= 0.0):
-                print "error for the orientation of boundary edge %d" %i
+                print("error for the orientation of boundary edge %d" %i)
 
         #check area and control_volume
         all_area = 0
-        for e in xrange(self.nelems):
+        for e in range(self.nelems):
             all_area += self.area[e]
 
         all_control_volume = 0
-        for i in xrange(self.nverts):
+        for i in range(self.nverts):
             all_control_volume += self.control_volume[i,0]
         if( np.fabs(all_area - all_control_volume) > 1.0e-10):
             return "control volume error"
 
 
         if(draw):
-            for i in xrange(self.nedges):
+            for i in range(self.nedges):
                 n1,n2 = self.edges[i,:]
                 x1,x2 = self.verts[n1],self.verts[n2]
 
 
                 plt.plot([x1[0],x2[0]],[x1[1],x2[1]],color = 'r')
-            for i in xrange(self.nbounds):
+            for i in range(self.nbounds):
 
                 n1,n2, e, type= self.bounds[i,:]
                 x1,x2 = self.verts[n1],self.verts[n2]
@@ -346,7 +346,7 @@ class Fluid_Domain:
                 elif(type == 3 ):
                     plt.plot([x1[0],x2[0]],[x1[1],x2[1]], color = 'm')
 
-            for i in xrange(self.nverts):
+            for i in range(self.nverts):
                 x,y = self.verts[i,:]
                 plt.text(x,y,'%d'%i)
 
@@ -360,7 +360,7 @@ class Fluid_Domain:
     def _lsq_gradient(self,V,status):
 
 
-        for i in xrange(self.nverts):
+        for i in range(self.nverts):
             A =[]
             b = []
             xc = self.verts[i,:]

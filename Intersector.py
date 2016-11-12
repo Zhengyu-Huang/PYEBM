@@ -108,7 +108,7 @@ class Intersector:
     def _build_fluid_bounding_boxes(self):
         verts = self.verts
         bounding_boxes = self.bounding_boxes
-        for i in xrange(self.nverts):
+        for i in range(self.nverts):
             box = bounding_boxes[i,:]
             box[0:2] = box[2:4] = verts[i,:]
             for j in self.connectivity[i]:
@@ -140,12 +140,12 @@ class Intersector:
         intersect_or_not = self.intersect_or_not
         intersect_result = self.intersect_result
         intersect_or_not[:] = False
-        for n in xrange(self.nverts):
+        for n in range(self.nverts):
             is_close[n] = _box_intersect(bounding_boxes[n,:],struc_box)
 
 
         verts = self.verts
-        for i in xrange(self.nedges):
+        for i in range(self.nedges):
             n1,n2 = self.edges[i,:]
             if(is_close[n1] and is_close[n1]):
                 x1,x2 = verts[n1,:],verts[n2,:]
@@ -181,15 +181,15 @@ class Intersector:
         intersect_result = self.intersect_result
         #flood fill method to initialize, assume the nodes at top are active
         #build connect set
-        connect = [[] for i in xrange(self.nverts)]
-        for i in xrange(self.nedges):
+        connect = [[] for i in range(self.nverts)]
+        for i in range(self.nedges):
             n1,n2 = self.edges[i,:]
             if(not intersect_or_not[i]):
                 connect[n1].append(n2)
                 connect[n2].append(n1)
 
         y_max = -np.inf
-        for n in xrange(self.nverts):
+        for n in range(self.nverts):
             y = self.verts[n,1]
             if(y > y_max):
                 active_node = n
@@ -206,7 +206,7 @@ class Intersector:
 
 
 
-        for i in xrange(self.nedges):
+        for i in range(self.nedges):
             if(intersect_or_not[i]):
                 n1,n2 = self.edges[i,:]
                 alpha_1, alpha_2 = intersect_result[i,:]
@@ -220,7 +220,7 @@ class Intersector:
         status = self.status
         verts = self.verts
         edges = self.edges
-        for i in xrange(self.nedges):
+        for i in range(self.nedges):
             n1,n2 = edges[i,:]
             if((status[n1] and not status[n2]) or (status[n2] and not status[n1])):
                 x_c = 0.5*(verts[n1,:] + verts[n2,:])
@@ -232,7 +232,7 @@ class Intersector:
         struc_verts = self.struc_verts
         min_dist = np.inf
 
-        for i in xrange(self.struc_nedges):
+        for i in range(self.struc_nedges):
             n1,n2 = struc_edges[i,:]
             x1 = struc_verts[n1,:]
             x2 = struc_verts[n2,:]
@@ -259,7 +259,7 @@ class Intersector:
         edge_center_closest_position = self.edge_center_closest_position
         connectivity = self.connectivity
 
-        for i in xrange(self.nedges):
+        for i in range(self.nedges):
             n1,n2 = edges[i,:]
             if((status[n1] and not status[n2]) or (status[n2] and not status[n1])):
 
@@ -302,7 +302,7 @@ class Intersector:
 
 
                 if(min_alpha == np.inf):
-                    print "error in compute HO stencil"
+                    print("error in compute HO stencil")
                 edge_center_stencil[i] = n_p,n_q,min_beta
 
                 #x_s = x_b + min_alpha*(x_c - x_b)
@@ -328,7 +328,7 @@ class Intersector:
         status = self.status
         intersect = self.intersect_or_not
         #intersected edge red; not intersected edge blue
-        for i in xrange(nedges):
+        for i in range(nedges):
             n1,n2 = edges[i,:]
             x1,x2 = verts[n1],verts[n2]
 
@@ -337,7 +337,7 @@ class Intersector:
             else:
                 plt.plot([x1[0],x2[0]],[x1[1],x2[1]], color = 'b')
         '''
-        for i in xrange(nedges):
+        for i in range(nedges):
             n1,n2 = edges[i,:]
 
             if((status[n1] and not status[n2]) or (status[n2] and not status[n1])):
@@ -347,12 +347,12 @@ class Intersector:
         '''
 
         #structure greee
-        for i in xrange(struc_nedges):
+        for i in range(struc_nedges):
             n1,n2 = struc_edges[i,:]
             x1,x2 = struc_verts[n1],struc_verts[n2]
             plt.plot([x1[0],x2[0]],[x1[1],x2[1]],color = 'g')
         #active vertex blue; inactive vertex red
-        for n in xrange(nverts):
+        for n in range(nverts):
             x = verts[n]
             if(status[n]):
                 plt.plot(x[0],x[1], 'ob')

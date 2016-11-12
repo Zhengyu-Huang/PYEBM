@@ -2,7 +2,24 @@ import numpy as np
 import sys
 import matplotlib.pyplot as plt
 from EOS import *
-mesh = "/home/icme-huang/FRG/2D_IBs_Euler-NS/TESTS/Blasius/blasius_00099.plt"
+
+def _pri_to_conser_all(V, W):
+    gamma = 1.4
+    W[:, 0] = V[:, 0]
+    W[:, 1] = V[:, 1] * V[:, 0]
+    W[:, 2] = V[:, 2] * V[:, 0]
+    W[:, 3] = 0.5 * V[:, 0] * (V[:, 1] ** 2 + V[:, 2] ** 2) + V[:, 3] / (gamma - 1.0)
+
+
+def _conser_to_pri_all(W, V):
+    gamma = 1.4
+    V[:, 0] = W[:, 0]
+    V[:, 1] = W[:, 1] / W[:, 0]
+    V[:, 2] = W[:, 2] / W[:, 0]
+    V[:, 3] = (W[:, 3] - 0.5 * W[:, 1] * V[:, 1] - 0.5 * W[:, 2] * V[:, 2]) * (gamma - 1.0)
+
+
+mesh = "/home/zhengyuh/Independence/2D_IBs_Euler-NS/TESTS/NacaBF/naca_inviscid.dat"
 
 
 
@@ -18,27 +35,28 @@ nelem = int(line[2].split('=')[1])
 verts = np.empty(shape = (n,2), dtype = float)
 V = np.empty(shape = (n,4), dtype = float)
 elems = np.empty(shape = (nelem,3), dtype = float)
-for i in xrange(n):
+for i in range(n):
     lines = fid.readline().split()
 
     verts[i,:] = float(lines[0]) , float(lines[1])
     V[i,:] = float(lines[2]) , float(lines[3]), float(lines[4]) , float(lines[5])
 
-for i in xrange(nelem):
+for i in range(nelem):
     lines = fid.readline().split()
     elems[i,:] = int(lines[0]) , int(lines[1]), int(lines[2])
 
 fid.close()
 
-W_me = np.load("solutionW.npy")
+W = np.empty(shape= (n,4), dtype = float)
+_pri_to_conser_all(V,W)
+np.save("nacaW_inviscid_dante",W)
+
+
+W_me = np.load("nacaW.npy")
 gamma = 1.4
 V_me = np.empty(shape= (n,4), dtype = float)
-V_me[:,0] = W_me[:,0]
-V_me[:,1] = W_me[:,1]/W_me[:,0]
-V_me[:,2] = W_me[:,2]/W_me[:,0]
-V_me[:,3] = (W_me[:,3] - 0.5*W_me[:,1]*V_me[:,1] - 0.5*W_me[:,2]*V_me[:,2]) * (gamma - 1.0)
-
-V = V- V_me
+_conser_to_pri_all(W_me,V_me)
+V = V - V_me
 
 
 elems -=1
