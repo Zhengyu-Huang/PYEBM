@@ -1,7 +1,7 @@
 import numpy as np
 
 class EOS:
-    def __init__(self, gamma,  Prandtl , Mach, Reynolds):
+    def __init__(self, gamma,  Prandtl = 0.72 , Mach = 1.0, Reynolds = 100):
         self.gamma = gamma
         self.Prandtl = Prandtl
         self.mu = Mach/Reynolds

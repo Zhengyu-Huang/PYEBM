@@ -298,21 +298,6 @@ def _Steger_Warming(prim_l, W_oo, k, eos):
     Dp = np.array([max(0,v), max(0,v), max(0,v+c*k_norm),max(0,v-c*k_norm)],dtype=float)
     Dm = np.array([min(0,v), min(0,v), min(0,v+c*k_norm),min(0,v-c*k_norm)],dtype=float)
 
-    theta = tilde_kx*vx + tilde_ky*vy
-
-    phi = np.sqrt((gamma - 1)/2*(vx*vx + vy*vy))
-
-    beta = 1/(2*c*c)
-
-    Q = np.array([[1,0,1,1],
-                 [vx,tilde_ky,vx + tilde_kx*c, vx - tilde_kx*c],
-                 [vy,-tilde_kx, vy+tilde_ky*c, vy-tilde_ky*c],
-                 [phi*phi/(gamma-1),tilde_ky*vx-tilde_kx*vy, (phi*phi + c*c)/(gamma-1)+c*theta,(phi*phi + c*c)/(gamma-1)-c*theta]])
-
-    Qinv = np.array([[1 - phi*phi/(c*c), (gamma - 1)*vx/c**2, (gamma - 1)*vy/c**2,-(gamma - 1)/c**2],
-                    [-(tilde_ky*vx - tilde_kx*vy),tilde_ky,-tilde_kx,0],
-                    [beta*(phi**2 - c*theta), beta*(tilde_kx*c - (gamma - 1)*vx), beta*(tilde_ky*c - (gamma - 1)*vy),beta*(gamma-1)],
-                    [beta*(phi**2 + c*theta), -beta*(tilde_kx*c + (gamma - 1)*vx), -beta*(tilde_ky*c + (gamma - 1)*vy),beta*(gamma-1)]])
 
     fp = 0.5*rho/gamma * np.array([2.0*(gamma-1)*Dp[0] + Dp[2] + Dp[3],
                                     2.0*(gamma-1)*Dp[0]*vx + Dp[2]*(vx + c*tilde_kx) + Dp[3]*(vx - c*tilde_kx),
@@ -320,23 +305,27 @@ def _Steger_Warming(prim_l, W_oo, k, eos):
                                     (gamma-1)*Dp[0]*(vx*vx + vy*vy) + 0.5*Dp[2]*((vx+c*tilde_kx)**2 + (vy+c*tilde_ky)**2) + 0.5*Dp[3]*((vx - c*tilde_kx)**2 + (vy -c*tilde_ky)**2)
                                     + (3.0 - gamma)*(Dp[2] + Dp[3])*c*c/(2*(gamma-1))], dtype=float)
 
-    fm = np.dot(Q,  Dm * np.dot(Qinv,W_oo))
 
+
+    v_square = vx**2 +vy**2
+    vn = vx*tilde_kx + vy*tilde_ky
+    e_l = 0.5*v_square + gamma*p/(rho*(gamma-1))
+    xn1 = (gamma-1)*(-0.5*v_square*W_oo[0] + vx*W_oo[1] + vy*W_oo[2] - W_oo[3])/c
+    xn2 = vn*W_oo[0] + tilde_kx*W_oo[1] + tilde_ky*W_oo[2]
+    vpp = Dm[0] - 0.5*(Dm[2] + Dm[3])
+    vpm = 0.5 * (Dm[3] - Dm[2])
+    ff = (vpp*xn1 +vpm*xn2)/c
+    gg = vpm*xn1 + vpp*xn2
+
+    fm = np.array([Dm[0]*W_oo[0] + ff,
+                   Dm[0]*W_oo[1] + vx*ff + tilde_kx*gg,
+                   Dm[0]*W_oo[2] + vy*ff  + tilde_ky*gg,
+                   Dm[0]*W_oo[3]] + e_l*ff + vn*gg)
 
 
     return fp + fm
-'''
-u_l = np.array([13.,2.,77.,5])
-u_r = np.array([6.,35.,66.,6])
-n = np.array([1.,2.])
-w_l = Pri_To_Conser(u_l)
-w_r = Pri_To_Conser(u_r)
-class Eos:
-    gamma = 1.4
-eos = Eos()
 
-_Steger_Warming(u_l,w_r,n,eos)
-'''
+
 
 
 def _Riemann_bWstar_FS(V,vv_wall,nn_wall,eos,equation_type):
@@ -374,3 +363,22 @@ def _Riemann_bWstar_FS(V,vv_wall,nn_wall,eos,equation_type):
         return np.array([rho_R, (vn_wall - vn)*nn_wall[0] + vx, (vn_wall -vn)*nn_wall[1] + vy, p_R],dtype=float)
     else:
         return np.array([rho_R, vv_wall[0], vv_wall[1], p_R],dtype=float)
+
+
+if __name__ == '__main__':
+
+    u_l = np.array([6., 2., 7., 2])
+    w_r = np.array([1., 8., 2., 3])
+    n = np.array([-1., 22.])
+
+
+
+    from EOS import *
+
+
+    eos = EOS(1.4)
+
+
+
+
+    print(_Steger_Warming(u_l, w_r, n, eos))

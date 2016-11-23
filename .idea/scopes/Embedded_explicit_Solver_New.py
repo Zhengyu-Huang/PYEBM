@@ -592,82 +592,74 @@ class Explicit_Solver:
         plt.colorbar()
         # set the limits of the plot to the limits of the data
         plt.axis([x.min(), x.max(), y.min(), y.max()])
-            
+
         plt.show()
         return
 
 
 
 '''
+
+
 #############################################################################################################################
 #############################################################################################################################
 #############################################################################################################################
 class Embedded_Explicit_Solver(Explicit_Solver):
-    def __init__(self,fluid_domain,io_data):
-        super().__init__(fluid_domain,io_data)
+    def __init__(self, fluid_domain, io_data):
+        super().__init__(fluid_domain, io_data)
 
-
-        self.intersector = Intersector(self.fluid_domain,self.structure)
-
-
+        self.intersector = Intersector(self.fluid_domain, self.structure)
 
     def _init_fluid_state(self):
 
         fluid = self.fluid_domain
-
 
         W = self.W
 
         nverts = fluid.nverts
 
         for i in range(nverts):
-
-            W[i,:] = self.W_oo
+            W[i, :] = self.W_oo
 
         self._apply_wall_boundary_condition(W)
         self.W = np.load("solutionW.npy")
 
-
-    def _lsq_gradient(self,V,status):
+    def _lsq_gradient(self, V, status):
 
         verts = self.fluid_domain.verts
         nverts = self.fluid_domain.nverts
 
-
-        A = np.empty(shape=[2,2],dtype = float)
-        Ainv = np.empty(shape=[2,2],dtype = float)
-        b = np.empty(shape=[2,4],dtype = float)
-        #todo build connectivity
+        A = np.empty(shape=[2, 2], dtype=float)
+        Ainv = np.empty(shape=[2, 2], dtype=float)
+        b = np.empty(shape=[2, 4], dtype=float)
+        # todo build connectivity
 
 
         for i in range(nverts):
-            A[:,:] = 0
-            b[:,:] = 0
-            xc = verts[i,:]
-            Vc = V[i,:]
+            A[:, :] = 0
+            b[:, :] = 0
+            xc = verts[i, :]
+            Vc = V[i, :]
 
             for neighbor in connectivity[i]:
-                if(status[neighbor] ):
-
-                    dx,dy = verts[neighbor] - xc
+                if (status[neighbor]):
+                    dx, dy = verts[neighbor] - xc
                     dV = V[neighbor] - Vc
 
-                    A[0,0] += dx*dx
-                    A[0,1] += dx*dy
-                    A[1,1] += dy*dy
-                    A[1,0] += dx*dy
+                    A[0, 0] += dx * dx
+                    A[0, 1] += dx * dy
+                    A[1, 1] += dy * dy
+                    A[1, 0] += dx * dy
 
-                    b[0,:] += dx * dV
-                    b[1,:] += dy * dV
+                    b[0, :] += dx * dV
+                    b[1, :] += dy * dV
 
-            det =  A[0,0]*A[1,1] - A[1,0]*A[0,1]
+            det = A[0, 0] * A[1, 1] - A[1, 0] * A[0, 1]
             assert np.fabs(det) > 1e-16
-            Ainv[0,0],Ainv[0,1],Ainv[1,0],Ainv[1,1] = A[1,1]/det,-A[1,0]/det, -A[0,1]/det,A[0,0]/det
+            Ainv[0, 0], Ainv[0, 1], Ainv[1, 0], Ainv[1, 1] = A[1, 1] / det, -A[1, 0] / det, -A[0, 1] / det, A[
+                0, 0] / det
 
-            self.gradient_V[i,:,:] = np.dot(Ainv,b)
-
-
-
+            self.gradient_V[i, :, :] = np.dot(Ainv, b)
 
 
 
@@ -683,9 +675,12 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
 
 
-        #self._viscid_flux_rhs_fem(t, with_dt)
 
-    def _euler_flux_rhs(self,V,R):
+
+
+            # self._viscid_flux_rhs_fem(t, with_dt)
+
+    def _euler_flux_rhs(self, V, R):
         # convert conservative state variable W to primitive state variable V
 
         fluid = self.fluid_domain
@@ -698,50 +693,46 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
         eos = self.eos
 
-        self._lsq_gradient(V,status)
+        self._lsq_gradient(V, status)
 
         for i in range(fluid.nedges):
-            n,m = fluid.edges[i,:]
+            n, m = fluid.edges[i, :]
 
-            v_n,v_m = V[n,:],V[m,:]
+            v_n, v_m = V[n, :], V[m, :]
 
-            n_active,m_active = status[n],status[m]
+            n_active, m_active = status[n], status[m]
 
             intersect = intersect_or_not[i]
 
-            e_nm = fluid.edge_vector[i,:]
+            e_nm = fluid.edge_vector[i, :]
 
-            dr_nm = fluid.directed_area_vector[i,:]
+            dr_nm = fluid.directed_area_vector[i, :]
 
-            dv_n,dv_m = np.dot(e_nm,self.gradient_V[n,:,:]), -np.dot(e_nm,self.gradient_V[m,:,:])
+            dv_n, dv_m = np.dot(e_nm, self.gradient_V[n, :, :]), -np.dot(e_nm, self.gradient_V[m, :, :])
 
-            if(n_active and m_active and not intersect):
+            if (n_active and m_active and not intersect):
 
-                v_L, v_R =limiter._reconstruct(v_n, v_m, dv_n, dv_m)
+                v_L, v_R = limiter._reconstruct(v_n, v_m, dv_n, dv_m)
 
-            elif(n_active and not m_active):
+            elif (n_active and not m_active):
 
-                v_L = v_n + 0.5*dv_n
+                v_L = v_n + 0.5 * dv_n
 
-                v_R = self.SIV(i,self.intersector)
+                v_R = self.SIV(i, self.intersector)
 
-            elif(m_active and not n_active):
+            elif (m_active and not n_active):
 
-                v_R = v_m + 0.5*dv_m
+                v_R = v_m + 0.5 * dv_m
 
-                v_L = self.SIV(i,self.intersector)
+                v_L = self.SIV(i, self.intersector)
 
-            flux = Flux._Roe_flux(v_L,v_R,dr_nm,eos)
+            flux = Flux._Roe_flux(v_L, v_R, dr_nm, eos)
 
-            R[n,:] -= flux
+            R[n, :] -= flux
 
-            R[m,:] += flux
+            R[m, :] += flux
 
-
-
-
-
-    def _euler_boundary_flux(self,V,R):
+    def _euler_boundary_flux(self, V, R):
 
         fluid = self.fluid_domain
 
@@ -751,71 +742,65 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
         for i in range(fluid.nbounds):
 
-            m,n,e,type = fluid.bounds[i,:]
+            m, n, e, type = fluid.bounds[i, :]
 
-            x_n = fluid.verts[n,:]
+            x_n = fluid.verts[n, :]
 
-            x_m = fluid.verts[m,:]
+            x_m = fluid.verts[m, :]
 
             status_m = status[m]
 
             status_n = status[n]
 
-            prim_m = V[m,:]
+            prim_m = V[m, :]
 
-            prim_n = V[n,:]
+            prim_n = V[n, :]
 
-            dr_nm = 0.5*np.array([x_n[1] - x_m[1], x_m[0] - x_n[0]],dtype=float)
+            dr_nm = 0.5 * np.array([x_n[1] - x_m[1], x_m[0] - x_n[0]], dtype=float)
 
-
-            if(type == 2): #free_stream
+            if (type == 2):  # free_stream
 
                 W_oo = self.W_oo
 
-                if(status_m):
-                    R[m,:] -= Flux._Steger_Warming(prim_m, W_oo, dr_nm, eos)
-                if(status_n):
+                if (status_m):
+                    R[m, :] -= Flux._Steger_Warming(prim_m, W_oo, dr_nm, eos)
+                if (status_n):
+                    R[n, :] -= Flux._Steger_Warming(prim_n, W_oo, dr_nm, eos)
 
-                    R[n,:] -= Flux._Steger_Warming(prim_n, W_oo, dr_nm, eos)
+            elif (type == 3):  # slip_wall
+                # weakly impose slip_wall boundary condition
+                if (status_m):
+                    R[m, :] -= [0.0, prim_m[3] * dr_nm[0], prim_m[3] * dr_nm[1], 0.0]
+                if (status_n):
+                    R[n, :] -= [0.0, prim_n[3] * dr_nm[0], prim_n[3] * dr_nm[1], 0.0]
 
-            elif(type == 3): #slip_wall
-                #weakly impose slip_wall boundary condition
-                if(status_m):
-                    R[m,:] -= [0.0, prim_m[3]*dr_nm[0] , prim_m[3]*dr_nm[1], 0.0]
-                if(status_n):
-                    R[n,:] -= [0.0, prim_n[3]*dr_nm[0] , prim_n[3]*dr_nm[1], 0.0]
-
-            elif(type == 4): #subsonic_outflow
+            elif (type == 4):  # subsonic_outflow
                 # parameterise the outflow state by a freestream pressure rho_f
                 p_oo = self.p_oo
-                if(status_m):
-                    W_moo = np.array([prim_m[0], prim_m[0]*prim_m[1],prim_m[0]*prim_m[2], p_oo/(eos.gamma-1) + 0.5*prim_m[0]*(prim_m[1]**2 + prim_m[2]**2)],dtype=float)
+                if (status_m):
+                    W_moo = np.array([prim_m[0], prim_m[0] * prim_m[1], prim_m[0] * prim_m[2],
+                                      p_oo / (eos.gamma - 1) + 0.5 * prim_m[0] * (prim_m[1] ** 2 + prim_m[2] ** 2)],
+                                     dtype=float)
 
-                    R[m,:] -= Flux._Steger_Warming(prim_m, W_moo, dr_nm, eos)
-                if(status_n):
+                    R[m, :] -= Flux._Steger_Warming(prim_m, W_moo, dr_nm, eos)
+                if (status_n):
+                    W_noo = np.array([prim_n[0], prim_n[0] * prim_n[1], prim_n[0] * prim_n[2],
+                                      p_oo / (eos.gamma - 1) + 0.5 * prim_n[0] * (prim_n[1] ** 2 + prim_n[2] ** 2)],
+                                     dtype=float)
 
-                    W_noo = np.array([prim_n[0], prim_n[0]*prim_n[1],prim_n[0]*prim_n[2], p_oo/(eos.gamma-1) + 0.5*prim_n[0]*(prim_n[1]**2 + prim_n[2]**2)],dtype=float)
-
-                    R[n,:] -= Flux._Steger_Warming(prim_n, W_noo, dr_nm, eos)
-
-
-
-
-
-
-
+                    R[n, :] -= Flux._Steger_Warming(prim_n, W_noo, dr_nm, eos)
 
     def _fem_ghost_node_update(self, n):
-        #update ghost value of node n
+        # update ghost value of node n
 
+        weight = 0
+        for i in edge_connectivity[n]:
+            if (intersect_or_not[i]):
+                n, m = fluid.edges[i, :]
 
-        for i in range(fluid.nedges):
-            if(intersect_or_not[i]):
-                n,m = fluid.edges[i,:]
+        return;
 
-        return ;
-
-    def _viscid_flux_rhs_fem(self,V,R):
+    def _viscid_flux_rhs_fem(self, V, R):
         eos = self.eos
         nelems = self.fluid_domain.nelems
         elems = self.fluid_domain.elems
@@ -825,26 +810,32 @@ class Embedded_Explicit_Solver(Explicit_Solver):
         tau = np.empty([2, 2], dtype=float)
         F_vis = np.empty(4, dtype=float)
         G_vis = np.empty(4, dtype=float)
+
+        ele_V = np.empty([3,4],dtype=float)
         for e in range(nelems):
             n1, n2, n3 = elems[e, :]
 
             ###########################################
             # ghost value update
             ###################################################
-            if(not status[n1] and not status[n2] not status[n3]):
+            if (not status[n1] and not status[n2] and not status[n3]):
                 continue
-            for n in elems[e,:]:
-                if(not status[n]):
-                    V[n,:] = self._fem_ghost_node_update(n)
+            for local_i in range(3):
+                n = elems[e, i]
+                if (not status[n]):
+                    ele_V[local_i, :] = self._fem_ghost_node_update(n)
+                else:
+                    ele_V[local_i,:] = V[n,:]
+
 
             #########################
             # Compute velocity gradients, temperature gradients, store in d_v
             #####################
 
 
-            vx1, vy1, T1 = V[n1, 1], V[n1, 2], eos._compute_temperature(V[n1, :])
-            vx2, vy2, T2 = V[n2, 1], V[n2, 2], eos._compute_temperature(V[n2, :])
-            vx3, vy3, T3 = V[n3, 1], V[n3, 2], eos._compute_temperature(V[n3, :])
+            vx1, vy1, T1 = ele_V[n1, 1], ele_V[n1, 2], eos._compute_temperature(ele_V[n1, :])
+            vx2, vy2, T2 = ele_V[n2, 1], ele_V[n2, 2], eos._compute_temperature(ele_V[n2, :])
+            vx3, vy3, T3 = ele_V[n3, 1], ele_V[n3, 2], eos._compute_temperature(ele_V[n3, :])
 
             vx, vy, T = (vx1 + vx2 + vx3) / 3.0, (vy1 + vy2 + vy3) / 3.0, (T1 + T2 + T3) / 3.0
 
@@ -900,12 +891,8 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             R[n2, :] += e_area * d_shape[0, 1] * F_vis + e_area * d_shape[1, 1] * G_vis
             R[n3, :] += e_area * d_shape[0, 2] * F_vis + e_area * d_shape[1, 2] * G_vis
 
-
-
-
-
-    def SIV(self,V, i,limiter):
-        #p---c----q
+    def SIV(self, V, i, limiter):
+        # p---c----q
         #    \
         #     \
         #  n1  si  n2
@@ -916,41 +903,39 @@ class Embedded_Explicit_Solver(Explicit_Solver):
         verts = self.fluid.verts
         gradient_V = self.fluid.gradient_V
 
-        n1,n2 = self.fluid.edges[i,:]
+        n1, n2 = self.fluid.edges[i, :]
         eos = self.eos
         status = intersector.status
-        x_si = 0.5*(verts[n1,:] + verts[n2,:])
+        x_si = 0.5 * (verts[n1, :] + verts[n2, :])
 
         n_p, n_q, alpha_c = self.intersector.edge_center_stencil[i]
 
-        #Information of closest point on the structure
-        struc_i,struc_alpha = self.intersector.edge_center_closest_position[i]
-        x_b,vv_wall,nn_wall = self.structure._point_info(struc_i,struc_alpha)
+        # Information of closest point on the structure
+        struc_i, struc_alpha = self.intersector.edge_center_closest_position[i]
+        x_b, vv_wall, nn_wall = self.structure._point_info(struc_i, struc_alpha)
 
-        #Construct x_c information, including primitive variable v_c, dv_c
-        x_p,x_q = verts[n_p,:],verts[n_q,:]
-        x_c = alpha_c*x_p + (1 - alpha_c)*x_q
-        if(status[n_p] and status[n_q]):
-            v_c = (1.0 - alpha_c)*V[n_p,:] + alpha_c*V[n_q,:]
-            dv_c= (1.0 - alpha_c)*gradient_V[n_p,:] + alpha_c*gradient_V[n_q,:]
-        elif(status[n_p]):
-            v_c = V[n_p,:]
-            dv_c= gradient_V[n_p,:]
-        elif(status[n_q]):
-            v_c = V[n_q,:]
-            dv_c= gradient_V[n_q,:]
-
+        # Construct x_c information, including primitive variable v_c, dv_c
+        x_p, x_q = verts[n_p, :], verts[n_q, :]
+        x_c = alpha_c * x_p + (1 - alpha_c) * x_q
+        if (status[n_p] and status[n_q]):
+            v_c = (1.0 - alpha_c) * V[n_p, :] + alpha_c * V[n_q, :]
+            dv_c = (1.0 - alpha_c) * gradient_V[n_p, :] + alpha_c * gradient_V[n_q, :]
+        elif (status[n_p]):
+            v_c = V[n_p, :]
+            dv_c = gradient_V[n_p, :]
+        elif (status[n_q]):
+            v_c = V[n_q, :]
+            dv_c = gradient_V[n_q, :]
 
         # extrapolate to interface, to get v_b
-        v_b = v_c + np.dot(x_b-x_c,dv_c)
+        v_b = v_c + np.dot(x_b - x_c, dv_c)
         # solve half Riemann problem, to get v_b^{Riemann}
-        v_bR = Flux._Riemann_bWstar_FS(v_b,vv_wall,nn_wall,eos,self.equation_type)
+        v_bR = Flux._Riemann_bWstar_FS(v_b, vv_wall, nn_wall, eos, self.equation_type)
         # interpolate to edge center, to get v_si
-        alpha_si = np.linalg.norm(x_c - x_si)/ np.linalg.norm(x_c - x_b)
-        v_si = (1 - alpha_si)*v_c + alpha_si*v_bR
+        alpha_si = np.linalg.norm(x_c - x_si) / np.linalg.norm(x_c - x_b)
+        v_si = (1 - alpha_si) * v_c + alpha_si * v_bR
 
         return v_si
 
-
-    def _apply_wall_boundary_condition(self,W):
-        return ;
+    def _apply_wall_boundary_condition(self, W):
+        return;
