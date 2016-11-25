@@ -738,9 +738,6 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             R[m,:] += flux
 
 
-
-
-
     def _euler_boundary_flux(self,V,R):
 
         fluid = self.fluid_domain
@@ -797,12 +794,6 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                     W_noo = np.array([prim_n[0], prim_n[0]*prim_n[1],prim_n[0]*prim_n[2], p_oo/(eos.gamma-1) + 0.5*prim_n[0]*(prim_n[1]**2 + prim_n[2]**2)],dtype=float)
 
                     R[n,:] -= Flux._Steger_Warming(prim_n, W_noo, dr_nm, eos)
-
-
-
-
-
-
 
 
     def _fem_ghost_node_update(self, n):

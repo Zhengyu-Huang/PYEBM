@@ -95,6 +95,8 @@ class Fluid_Domain:
         self._init_edge_vector()
 
         self._init_connectivity()
+        #self._init_node_edge_connectivity()
+        self._init_node_elem_connectivity()
         self._init_node_min_edge()
         self._init_shape_function_gradient()
         self._init_cell_area()
@@ -181,6 +183,26 @@ class Fluid_Domain:
              n1,n2 = edges[i,:]
              self.connectivity[n1].append(n2)
              self.connectivity[n2].append(n1)
+
+    def _init_node_edge_connectivity(self):
+        nedges = self.nedges
+        edges = self.edges
+        nverts = self.nverts
+        self.node_edge_connectivity = [[] for i in range(nverts)]
+        for i in range(nedges):
+            n1, n2 = edges[i, :]
+            self.node_edge_connectivity[n1].append(i)
+            self.node_edge_connectivity[n2].append(i)
+
+    def _init_node_elem_connectivity(self):
+        nelems = self.nelems
+        elems = self.elems
+        nverts = self.nverts
+        self.node_elem_connectivity = [[] for i in range(nverts)]
+        for e in range(nelems):
+            for n in elems[e,:]:
+                self.node_elem_connectivity[n].append(e)
+
 
 
     def _init_cell_area(self):

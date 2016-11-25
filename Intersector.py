@@ -28,11 +28,15 @@ def _compute_dist(p,x1,x2):
 
 def _line_intersect(x1,x2,y1,y2):
     # compute the intersection of line x1,x2 and line y1,y2
+    # (1-alpha)*x1 + alpha*x2 = (1-beta)*y1 + beta*y2
     # x1 + alpha*(x2-x1) = y1 + beta*(y2-y1)
     # return intersect, alpha, beta
     delta = np.cross(x2-x1,y2-y1)
     A = np.array([[x2[0] - x1[0],y1[0] - y2[0]], [x2[1] - x1[1], y1[1] - y2[1]]])
     b = y1 - x1
+
+    if np.fabs(np.dot(x2 - x1, x2 - x1)) < 1e-16:
+        print(x1,x2,y1,y2)
 
     if(np.fabs(delta) < 1e-16):
         if(np.fabs(np.cross(x2-x1,y1-x1)) > 1e-16):
@@ -58,27 +62,52 @@ def _line_intersect(x1,x2,y1,y2):
 
 class Intersector:
     def __init__(self,fluid,structure):
+        '''
         ########################################################################################
         #######       NAME TABLE
         ########################################################################################
-        # nedges:int, fluid edge number
-        # nedges:ref, fluid edges
-        # verts: ref, fluid verts coordinate
-        # nverts:int, fluid vert number
-        # connectivity: ref, fluid vert connectivity
-        # bounding_boxes: float[nverts,4], bounding box of vert and its neighbors, as x_min, y_min, x_max,y_max
-        # struc_nedges:int, structure boundary edge number
-        # struc_nverts:int, structure boundary vert number
-        # struc_verts:ref, structure verts
-        # struc_edges,ref, structure edges
-        # is_close, 
+        bounding_boxes: float[nverts,4], bounding box of vert and its neighbors, as x_min, y_min, x_max,y_max
+        connectivity: ref, fluid vert connectivity
+
+        edge_center_stencil : (int,int,float)[nedges], for those ghost edge center which has one ghost node, its stencil as dante's definition and
+        its intersection on the stencil
+
+        edge_center_closest_position : (int float)[nedges] , for those ghost edge center which has one ghost node, its closest
+        structure edge and its position
+
+        ghost_node_closest_position : (int float)[nedges] , for those ghost nodes near IB, its closest structure edge and its position
+
+        ghost_node_stencil : (int, int,float,int,int, float)[nedges], for those ghost nodes near IB, its stencil node numbers as dante's definition and
+        its intersection on the stencil, for both side,
+
+        is_close: bool[nverts], true if vert is close to immersed boundary
+        intersect_or_not: bool[nedges], true if the edge intersects with structure
+        intersect_result = float[nedges,2], save the intersection point information for fluid edge, first one left to right , second one right to left
+
+        nedges:int, fluid edge number
+        nedges:ref, fluid edges
+
+        nverts:int, fluid vert number
+
+
+        struc_nedges:int, structure boundary edge number
+        struc_nverts:int, structure boundary vert number
+        struc_verts:ref, structure verts
+        struc_edges:ref, structure edges
+
+        status_in_fluid: bool[nverts], true if the vert is in the fluid domain
+        status : bool[nverts], true if the vert's whole control volume is in the fluid domain
+        verts: ref, fluid verts coordinate
+        '''
         self.edges = fluid.edges
         self.nedges = fluid.nedges
+        self.elems = fluid.elems
 
         self.verts = fluid.verts
         self.nverts = fluid.nverts
 
         self.connectivity = fluid.connectivity
+        self.node_elem_connectivity = fluid.node_elem_connectivity
 
         self.bounding_boxes = np.empty(shape=[self.nverts,4],dtype=float)
         self.struc_box  = np.array([np.inf,np.inf,-np.inf,-np.inf],dtype=float)
@@ -87,6 +116,7 @@ class Intersector:
         self.struc_nverts = structure.nverts
         self.struc_verts = structure.verts
         self.struc_edges = structure.bounds
+        self.struc_normal = structure.edges_norm
 
         self.is_close = np.empty(shape=[self.nverts],dtype=bool)
         self.status_in_fluid = np.empty(shape=[self.nverts],dtype=bool)
@@ -99,10 +129,20 @@ class Intersector:
 
         self.edge_center_closest_position = np.empty(shape=[self.nedges],dtype='int, float')
 
+        self.ghost_node_stencil = np.empty(shape=[self.nverts],dtype='int,int,float,int,int,float')
+        # the first stencil is xs -> x_b side, xs is the closest point at structure
+        # the second stencil is x_b xs side
+        self.ghost_node_closest_position = np.empty(shape=[self.nedges],dtype='int, float')
+
+
+
         self._build_fluid_bounding_boxes()
         self._build_intersect_result()
         self._initial_status()
-        self._compute_HO_stencil()
+        #self._compute_HO_stencil()
+        self._compute_ghost_stencil()
+
+
 
 
     def _build_fluid_bounding_boxes(self):
@@ -147,7 +187,7 @@ class Intersector:
         verts = self.verts
         for i in range(self.nedges):
             n1,n2 = self.edges[i,:]
-            if(is_close[n1] and is_close[n1]):
+            if(is_close[n1] and is_close[n2]):
                 x1,x2 = verts[n1,:],verts[n2,:]
                 alpha = self._build_intersect_result_helper(x1,x2)
                 if(alpha != np.inf):
@@ -170,8 +210,6 @@ class Intersector:
         return min_alpha
 
 
-
-    #def _initial_status_in_fluid(self):
 
     def _initial_status(self):
         status = self.status
@@ -216,7 +254,7 @@ class Intersector:
                     status[n2] = False
 
 
-    def _compute_closest_position(self):
+    def _compute_edge_center_closest_position(self):
         status = self.status
         verts = self.verts
         edges = self.edges
@@ -245,15 +283,15 @@ class Intersector:
         return min_dist, argmin_edge_id, min_alpha
 
 
-
-    def _compute_HO_stencil(self):
+    '''
+    def _compute_HO_stencil_old(self):
         status = self.status
         verts = self.verts
         edges = self.edges
         struc_edges = self.struc_edges
         struc_verts = self.struc_verts
 
-        self._compute_closest_position()
+        self._compute_edge_center_closest_position()
 
         edge_center_stencil = self.edge_center_stencil
         edge_center_closest_position = self.edge_center_closest_position
@@ -294,7 +332,7 @@ class Intersector:
                                     n_p,n_q = n,m
                                     stencil_status = True
 
-                            elif(not stencil_status and min_alpha < alpha):# stencil has 1 active node
+                            elif(not stencil_status and alpha < min_alpha):# stencil has 1 active node
 
                                 min_alpha = alpha
                                 min_beta = beta
@@ -308,12 +346,164 @@ class Intersector:
                 #x_s = x_b + min_alpha*(x_c - x_b)
                 #plt.plot([x_b[0],x_s[0]],[x_b[1],x_s[1]],color = 'y')
         #plt.show()
+        '''
+    def _compute_HO_stencil(self):
+        status = self.status
+        verts = self.verts
+        edges = self.edges
+
+        self._compute_edge_center_closest_position()
+
+        edge_center_stencil = self.edge_center_stencil
+        edge_center_closest_position = self.edge_center_closest_position
+
+
+        for i in range(self.nedges):
+            n1,n2 = edges[i,:]
+            if((status[n1] and not status[n2]) or (status[n2] and not status[n1])):
+
+                x_c = 0.5 * (verts[n1, :] + verts[n2, :])
+
+                stencil, min_beta = self._compute_stencil(x_c, edge_center_closest_position[i], [n1,n2])
+
+
+                edge_center_stencil[i] = stencil[0][0],stencil[0][1], min_beta[0]
+
+                #x_s = x_b + min_alpha*(x_c - x_b)
+                #plt.plot([x_b[0],x_s[0]],[x_b[1],x_s[1]],color = 'y')
+        #plt.show()
 
 
 
 
 
-    def draw(self):
+    def _compute_stencil(self, x_b, xs_info,nodes,num_side = 1):
+        '''
+
+        :param nodes: candidate nodes
+        :param xs,ys: its closest points on IB
+        :return:
+
+        check all element nodes of neighbor nodes for candidates
+        '''
+
+        s_i, s_alpha = xs_info
+
+        s_n,s_m = self.struc_edges[s_i]
+
+        s_xl,s_xr = self.struc_verts[s_n], self.struc_verts[s_m]
+
+        x_s = (1 - s_alpha)*s_xl + s_alpha*s_xr
+
+        s_normal = self.struc_normal[s_i]
+
+        min_alpha = [np.inf, np.inf]
+
+        min_beta = [0.0]*num_side
+
+        stencil = [[-1,-1]]*num_side
+
+        stencil_status = [False,False]
+
+        connectivity = self.connectivity
+        node_elem_connectivity = self.node_elem_connectivity
+        status = self.status
+        verts = self.verts
+        elems = self.elems
+
+        for n in nodes:
+
+            direction = s_normal[0] *(x_b[0] - x_s[0]) + s_normal[1] *(x_b[1] - x_s[1])
+
+            stencil_status[:] = False,False
+
+            for neigh in connectivity[n]:
+                for ele in node_elem_connectivity[neigh]:
+                    ele_node = elems[ele]
+                    for i in range(-1,2):
+                        n1,n2 = ele_node[i],ele_node[i+1]
+
+                        if (not status[n1] and not status[n2]):  # ignore stencil with 2 inactive nodes
+                            continue
+                        x1,x2 = verts[n1],verts[n2]
+
+                        alpha, beta = _line_intersect(x_s, x_b, x1, x2)
+
+
+
+
+
+                        if (0 <= beta <= 1.0):  # intersect the edge
+                            good_stencil = status[n1] and status[n2]
+
+
+                            side = 0 if alpha >= -1e-14 else 1
+
+                            if(num_side == 1 and side == 1):
+                                continue
+
+                            alpha = np.fabs(alpha)
+
+                            if (good_stencil):  # stencil has 2 active nodes
+                                if (not stencil_status[side] or alpha < min_alpha[side]):
+                                    min_alpha[side] = alpha
+                                    min_beta[side] = beta
+                                    stencil[side] = n1, n2
+                                    stencil_status[side] = True
+
+                            elif (not stencil_status[side] and alpha < min_alpha[side]):  # stencil has 1 active node
+
+                                min_alpha[side] = alpha
+                                min_beta[side] = beta
+                                stencil[side] = n1,n2
+
+
+        return stencil, min_beta
+
+
+
+
+
+
+
+    def _compute_ghost_stencil(self):
+        status = self.status
+        is_close = self.is_close
+        nverts = self.nverts
+        verts = self.verts
+
+        ghost_node_closest_position = self.ghost_node_closest_position
+
+        ghost_node_stencil = self.ghost_node_stencil
+
+        for n in range(nverts):
+
+
+            if (not is_close[n] or status[n]): #skip these active or far from IB nodes
+                continue
+            p = verts[n]
+            dist, struc_edge_id, alpha = self._compute_closest_position_helper(p)
+            ghost_node_closest_position[n] = struc_edge_id,alpha
+
+            stencil, min_beta = self._compute_stencil(p, ghost_node_closest_position[n], [n],num_side = 2)
+
+            ghost_node_stencil[n] = stencil[0][0],stencil[0][1], min_beta[0], stencil[1][0], stencil[1][1], min_beta[1]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def draw(self,node_status = False,node_number = False, edge_center_stencil=False, ghost_stencil=False):
         edges = self.edges
         nedges = self.nedges
 
@@ -327,6 +517,8 @@ class Intersector:
 
         status = self.status
         intersect = self.intersect_or_not
+        is_close = self.is_close
+
         #intersected edge red; not intersected edge blue
         for i in range(nedges):
             n1,n2 = edges[i,:]
@@ -336,28 +528,106 @@ class Intersector:
                 plt.plot([x1[0],x2[0]],[x1[1],x2[1]],color = 'r')
             else:
                 plt.plot([x1[0],x2[0]],[x1[1],x2[1]], color = 'b')
-        '''
-        for i in range(nedges):
-            n1,n2 = edges[i,:]
 
-            if((status[n1] and not status[n2]) or (status[n2] and not status[n1])):
-                n_p,n_q = self.edge_center_stencil[i,:]
-                x_p,x_q = verts[n_p],verts[n_q]
-                plt.plot([x_p[0],x_q[0]],[x_p[1],x_q[1]],color = 'k')
-        '''
+        # draw edge center stencil
+        if(edge_center_stencil):
+            for i in range(nedges):
+                n1,n2 = edges[i,:]
 
-        #structure greee
+                if((status[n1] and not status[n2]) or (status[n2] and not status[n1])):
+
+                    n_p,n_q,alpha = self.edge_center_stencil[i]
+
+                    x_p,x_q = verts[n_p],verts[n_q]
+
+                    x_1,x_2 = verts[n1], verts[n2]
+
+                    x_stencil = (1-alpha)*x_p + alpha*x_q
+
+                    x_c = (x_1 + x_2)/2
+
+                    s_i, s_alpha = self.edge_center_closest_position[i]
+
+                    x_s1, x_s2 = struc_verts[struc_edges[s_i][0]],struc_verts[struc_edges[s_i][1]]
+
+                    x_s = (1-s_alpha)*x_s1 + s_alpha*x_s2
+
+                    plt.plot([x_s[0],x_c[0],x_stencil[0]],[x_s[1],x_c[1],x_stencil[1]],color = 'k')
+
+                    plt.plot(x_s[0], x_s[1], 'ok')
+
+                    plt.plot(x_c[0], x_c[1], 'ok')
+
+                    plt.plot(x_stencil[0], x_stencil[1], 'ok')
+
+        # draw ghost node stencil
+        if(ghost_stencil):
+            for n in range(nverts):
+
+                if (not is_close[n] or status[n]): #skip these active or far from IB nodes
+                    continue
+
+                x_n = verts[n]
+
+                s_n, s_alpha = self.ghost_node_closest_position[n]
+
+                x_s1, x_s2 = struc_verts[struc_edges[s_n][0]], struc_verts[struc_edges[s_n][1]]
+
+                x_s = (1 - s_alpha) * x_s1 + s_alpha * x_s2
+
+                plt.plot(x_s[0], x_s[1], 'ok')
+
+                plt.plot(x_n[0], x_n[1], 'ok')
+
+                for i in range(2):
+                    n_p, n_q, alpha = self.ghost_node_stencil[n][3*i],self.ghost_node_stencil[n][3*i+1],self.ghost_node_stencil[n][3*i+2]
+
+                    if(n_p == -1 or n_q == -1):
+                        continue
+
+                    x_p, x_q = verts[n_p], verts[n_q]
+
+
+                    x_stencil = (1 - alpha) * x_p + alpha * x_q
+
+
+
+
+
+                    plt.plot([x_s[0], x_n[0], x_stencil[0]], [x_s[1], x_n[1], x_stencil[1]], color='k')
+
+
+                    if(i == 0):
+                        plt.plot(x_stencil[0], x_stencil[1], 'ok')
+                    else:
+                        plt.plot(x_stencil[0], x_stencil[1], 'or')
+
+
+
+        #structure green
         for i in range(struc_nedges):
             n1,n2 = struc_edges[i,:]
             x1,x2 = struc_verts[n1],struc_verts[n2]
             plt.plot([x1[0],x2[0]],[x1[1],x2[1]],color = 'g')
-        #active vertex blue; inactive vertex red
-        for n in range(nverts):
-            x = verts[n]
-            if(status[n]):
-                plt.plot(x[0],x[1], 'ob')
-            else:
-                plt.plot(x[0],x[1], 'or')
+
+        if(node_number):
+            # active vertex blue; inactive vertex red
+            for n in range(nverts):
+                x,y = verts[n]
+                plt.text(x, y, '%d' % n,'b')
+
+        if(node_status):
+
+            #active vertex blue; inactive vertex red
+            for n in range(nverts):
+                x,y = verts[n]
+                if(status[n]):
+
+                    plt.text(x, y, '%d' % n, color='green')
+
+                else:
+                    plt.text(x, y, '%d' % n, color = 'red')
+
         plt.axis([-2, 2, -2, 2])
         plt.show()
 
@@ -366,9 +636,9 @@ class Intersector:
 
 
 
-'''
-fluid = Fluid_Domain('blasius_coarse.fgrid')
-structure = Structure('plate.fgrid')
-intersector = Intersector(fluid,structure)
-intersector.draw()
-'''
+if __name__ == "__main__":
+    fluid = Fluid_Domain('../Test/IntersectorTest/blasius_coarse')
+    structure = Structure('../Test/IntersectorTest/shell.fgrid')
+    intersector = Intersector(fluid,structure)
+    #intersector.draw(True,  False)
+    intersector.draw(True, False, False, True)

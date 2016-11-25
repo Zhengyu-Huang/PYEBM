@@ -22,7 +22,7 @@ class Structure:
         self.nverts = int(fid.readline())
         self.verts = np.empty(shape=[self.nverts,2],dtype=float)
         for i in range(self.nverts):
-            self.verts[i,:] = map(float,fid.readline().split())
+            self.verts[i,:] = [float(x) for x in fid.readline().split()]
         self.nbounds = int(fid.readline())
         self.bounds = np.empty(shape=[self.nbounds,2],dtype=int)
         for i in range(self.nbounds):
@@ -30,9 +30,14 @@ class Structure:
 
         self.vel = np.zeros(shape=[self.nverts,2],dtype=float)
         self.edges_norm = np.zeros(shape=[self.nbounds,2],dtype=float)
-        self.verts_norm = np.zeros(shape=[self.nbounds,2],dtype=float)
+        self.verts_norm = np.zeros(shape=[self.nverts,2],dtype=float)
 
         fid.close()
+        self._construct_norm()
+
+
+
+
     def _construct_norm(self):
         bounds = self.bounds
         verts = self.verts
