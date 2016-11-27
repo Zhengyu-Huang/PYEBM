@@ -42,6 +42,7 @@ class Fluid_Domain:
         #                n1
         #   
         #  shape_function_gradient = None;
+        #  edge_info :int array[:,4],2 edge nodes numbers, two elements id
         ####################################################################################################
         self.nverts = int(fid.readline())
         self.verts = np.empty(shape=[self.nverts,2],dtype=float)
@@ -92,10 +93,14 @@ class Fluid_Domain:
 
         self._init_edge_directed_area_vector(edge_info)
 
+        self._init_elem_edge_connectivity(edge_info)
+
         self._init_edge_vector()
 
         self._init_connectivity()
-        #self._init_node_edge_connectivity()
+
+
+        self._init_node_edge_connectivity()
         self._init_node_elem_connectivity()
         self._init_node_min_edge()
         self._init_shape_function_gradient()
@@ -155,6 +160,21 @@ class Fluid_Domain:
                 xc,yc = elem_center[e2,:]
                 direction = np.sign((x1 - x2)*(yc - ym) - (xc - xm)*(y1 - y2))
                 self.directed_area_vector[i] += direction*(ym - yc), direction*(xc - xm)
+
+
+    def _init_elem_edge_connectivity(self, edge_info):
+        nelems = self.nelems
+        nedges = self.nedges
+        elem_edge_connectivity = [[] for i in range(nelems)]
+        for i in range(nedges):
+            e1,e2 = edge_info[i,2:4]
+            for e in [e1,e2]:
+                if(e != -1):
+                    elem_edge_connectivity[e].append(i)
+        self.elem_edge_connectivity = np.array(elem_edge_connectivity,dtype=int)
+
+
+
 
     def _init_edge_vector(self):
         edges = self.edges

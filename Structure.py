@@ -2,7 +2,7 @@ __author__ = 'zhengyuh'
 import numpy as np
 import sys
 class Structure:
-    def __init__(self,mesh):
+    def __init__(self,structure_input):
         ########################################################################
         ##### NAME TABLE
         ########################################################################
@@ -13,6 +13,9 @@ class Structure:
         # vel: float array[nverts,2], velocity of boundary verts
         # edges_norm: float array[nbounds,2], edge outward norm, length is the edge length  
         # verts_norm: float array[nverts,2], vert outward norm, average of two neighbor edge norms
+
+
+        mesh = structure_input + ".sgrid"
 
         try:
             fid = open(mesh, "r")
@@ -80,7 +83,7 @@ class Structure:
         else:# the point on the edge
             norm_p = edges_norm[i,:]
 
-        return x_p, norm_p, v_p
+        return x_p, v_p, norm_p
 
 
 

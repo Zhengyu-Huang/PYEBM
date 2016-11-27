@@ -379,7 +379,7 @@ def _Riemann_bWstar_FS(V,vv_wall,nn_wall,eos,equation_type):
 # if fluid_normal =-1 piston is on the left
 
     nn_wall = nn_wall/np.linalg.norm(nn_wall)
-    [gamma] = eos;
+    gamma = eos.gamma;
     [rho, vx, vy, p] = V;
 
     vn = vx*nn_wall[0] + vy*nn_wall[1]

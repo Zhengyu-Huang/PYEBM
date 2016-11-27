@@ -14,6 +14,9 @@ class Io_Data():
                  if(lines[0] == "fluidmesh"):
                      self.fluidmesh = lines[1]
 
+                 elif(lines[0] == "structuremesh"):
+                     self.structuremesh = lines[1]
+
                  elif(lines[0] == "framework"):
                      self.frame = lines[1]
 
