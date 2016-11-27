@@ -1,4 +1,5 @@
 import numpy as np
+import copy as copy
 import matplotlib.pyplot as plt
 from Fluid_Domain import Fluid_Domain
 from Structure import Structure
@@ -130,6 +131,8 @@ class Intersector:
 
             neighbors: reference, list of list fluid vertex neighbors, neighbors[i] contains node i 's neighbor nodes
 
+            connectivity: list of fluid vertex list, connectivity[i] contains i's neighbor, which is in the save fluid side,
+                          the edge is not intersected.
 
             edge_center_stencil : (int,int,float)[number of fluid edges], for those ghost edge center which has one ghost node,
                                   its stencil as dante's definition and its intersection on the stencil
@@ -220,6 +223,8 @@ class Intersector:
         self._build_fluid_bounding_boxes()
         self._build_close_node_result()
         self._build_intersect_result()
+        self._build_connectivity()
+        self._initial_status_in_fluid()
         self._initial_status()
         self._compute_HO_stencil()
         self._compute_ghost_stencil()
@@ -359,9 +364,22 @@ class Intersector:
                 min_beta = beta
         return min_alpha
 
-    def _initial_status(self):
+
+
+    def _build_connectivity(self):
+
+        # build connect set
+        intersect_or_not = self.intersect_or_not
+        self.connectivity = connectivity = [[] for i in range(self.nverts)]
+        for i in range(self.nedges):
+            n1, n2 = self.edges[i, :]
+            if (not intersect_or_not[i]):
+                connectivity[n1].append(n2)
+                connectivity[n2].append(n1)
+
+    def _initial_status_in_fluid(self):
         """
-        Initialize fluid state by flood filling method, assume the nodes at top are active
+        Initialize node in fluid state by flood filling method, assume the nodes at top are active
 
         Args:
             None
@@ -369,19 +387,13 @@ class Intersector:
             None
 
         """
-        print('start initializing status')
-        status = self.status
-        status[:] = False
-        intersect_or_not = self.intersect_or_not
-        intersect_result = self.intersect_result
+        print('start initializing status in fluid')
+        status_in_fluid = self.status_in_fluid
+        status_in_fluid[:] = False
 
-        # build connect set
-        connect = [[] for i in range(self.nverts)]
-        for i in range(self.nedges):
-            n1, n2 = self.edges[i, :]
-            if (not intersect_or_not[i]):
-                connect[n1].append(n2)
-                connect[n2].append(n1)
+        connectivity = self.connectivity
+
+
 
         y_max = -np.inf
         for n in range(self.nverts):
@@ -389,16 +401,24 @@ class Intersector:
             if (y > y_max):
                 active_node = n
                 y_max = y
-        status[active_node] = True
+        status_in_fluid[active_node] = True
 
         flood_fill = [active_node]
         while flood_fill:
             current_node = flood_fill.pop()
-            for neighbor in connect[current_node]:
-                if (not status[neighbor]):
-                    status[neighbor] = status[current_node]
+            for neighbor in connectivity[current_node]:
+                if (not status_in_fluid[neighbor]):
+                    status_in_fluid[neighbor] = True
                     flood_fill.append(neighbor)
 
+        print('finish initializing status in fluid')
+
+
+    def _initial_status(self):
+        print('start initializing status')
+        intersect_or_not = self.intersect_or_not
+        intersect_result = self.intersect_result
+        self.status = status = copy.copy(self.status_in_fluid)
         for i in range(self.nedges):
             if (intersect_or_not[i]):
                 n1, n2 = self.edges[i, :]

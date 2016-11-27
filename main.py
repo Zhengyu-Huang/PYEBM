@@ -2,7 +2,7 @@
 from Embedded_Explicit_Solver_New import *
 from Io_Data import *
 
-
+'''
 def main():
     # get input parameter
     # read fluid grid & construct fluid grid data
@@ -65,5 +65,5 @@ def main():
     # construct intersector
 
     # set_initial_solution
-'''
+
 main()
