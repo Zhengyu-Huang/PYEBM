@@ -22,7 +22,7 @@ class Fluid_Domain:
         # elems: int array[:,3], element nodes id
         # nedges: int, number of edges
         # edges: int array[:,2], edge nodes id
-        # connectivity: a list nverts lists, each list stores neighbor of corresponding verts
+        # neighbors: a list nverts lists, each list stores neighbors of corresponding verts
         # nbound_type: int, number of different boundary conditions
         # nbounds: int, number of boundary edges
         # bc_type: string list, name of different boundary conditions
@@ -93,15 +93,15 @@ class Fluid_Domain:
 
         self._init_edge_directed_area_vector(edge_info)
 
-        self._init_elem_edge_connectivity(edge_info)
+        self._init_elem_edge_neighbors(edge_info)
 
         self._init_edge_vector()
 
-        self._init_connectivity()
+        self._init_neighbors()
 
 
-        self._init_node_edge_connectivity()
-        self._init_node_elem_connectivity()
+        self._init_node_edge_neighbors()
+        self._init_node_elem_neighbors()
         self._init_node_min_edge()
         self._init_shape_function_gradient()
         self._init_cell_area()
@@ -162,16 +162,16 @@ class Fluid_Domain:
                 self.directed_area_vector[i] += direction*(ym - yc), direction*(xc - xm)
 
 
-    def _init_elem_edge_connectivity(self, edge_info):
+    def _init_elem_edge_neighbors(self, edge_info):
         nelems = self.nelems
         nedges = self.nedges
-        elem_edge_connectivity = [[] for i in range(nelems)]
+        elem_edge_neighbors = [[] for i in range(nelems)]
         for i in range(nedges):
             e1,e2 = edge_info[i,2:4]
             for e in [e1,e2]:
                 if(e != -1):
-                    elem_edge_connectivity[e].append(i)
-        self.elem_edge_connectivity = np.array(elem_edge_connectivity,dtype=int)
+                    elem_edge_neighbors[e].append(i)
+        self.elem_edge_neighbors = np.array(elem_edge_neighbors,dtype=int)
 
 
 
@@ -194,34 +194,34 @@ class Fluid_Domain:
 
 
 
-    def _init_connectivity(self):
+    def _init_neighbors(self):
          nedges = self.nedges
          edges = self.edges
          nverts = self.nverts
-         self.connectivity = [[] for i in range(nverts)]
+         self.neighbors = [[] for i in range(nverts)]
          for i in range(nedges):
              n1,n2 = edges[i,:]
-             self.connectivity[n1].append(n2)
-             self.connectivity[n2].append(n1)
+             self.neighbors[n1].append(n2)
+             self.neighbors[n2].append(n1)
 
-    def _init_node_edge_connectivity(self):
+    def _init_node_edge_neighbors(self):
         nedges = self.nedges
         edges = self.edges
         nverts = self.nverts
-        self.node_edge_connectivity = [[] for i in range(nverts)]
+        self.node_edge_neighbors = [[] for i in range(nverts)]
         for i in range(nedges):
             n1, n2 = edges[i, :]
-            self.node_edge_connectivity[n1].append(i)
-            self.node_edge_connectivity[n2].append(i)
+            self.node_edge_neighbors[n1].append(i)
+            self.node_edge_neighbors[n2].append(i)
 
-    def _init_node_elem_connectivity(self):
+    def _init_node_elem_neighbors(self):
         nelems = self.nelems
         elems = self.elems
         nverts = self.nverts
-        self.node_elem_connectivity = [[] for i in range(nverts)]
+        self.node_elem_neighbors = [[] for i in range(nverts)]
         for e in range(nelems):
             for n in elems[e,:]:
-                self.node_elem_connectivity[n].append(e)
+                self.node_elem_neighbors[n].append(e)
 
 
 
@@ -281,7 +281,7 @@ class Fluid_Domain:
 
     def _init_node_min_edge(self):
         nverts = self.nverts
-        connectivity = self.connectivity
+        neighbors = self.neighbors
         verts = self.verts
 
         self.min_edge = np.empty(shape=[self.nverts,1],dtype=float)
@@ -292,7 +292,7 @@ class Fluid_Domain:
             #################################################################
             self.min_edge[n,0] = np.inf
             x_n = verts[n,:]
-            for m in connectivity[n]:
+            for m in neighbors[n]:
                 x_m = verts[m,:]
 
                 self.min_edge[n,0] = min(self.min_edge[n,0], np.linalg.norm(x_n-x_m))
@@ -407,7 +407,7 @@ class Fluid_Domain:
             b = []
             xc = self.verts[i,:]
             Vc = self.V[i,:]
-            for neighbor in self.connectivity[i]:
+            for neighbor in self.neighbors[i]:
                 if(status[neighbor]):#active node
                     xi = self.verts[neighbor]
                     Vi = self.verts[neighbor]

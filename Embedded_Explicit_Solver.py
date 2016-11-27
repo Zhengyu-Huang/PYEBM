@@ -181,7 +181,7 @@ class Explicit_Solver:
 
         verts = self.fluid_domain.verts
         nverts = self.fluid_domain.nverts
-        connectivity = self.fluid_domain.connectivity
+        neighbors = self.fluid_domain.neighbors
 
         A = np.empty(shape=[2,2],dtype = float)
         Ainv = np.empty(shape=[2,2],dtype = float)
@@ -193,7 +193,7 @@ class Explicit_Solver:
             xc = verts[i,:]
             Vc = V[i,:]
 
-            for neighbor in connectivity[i]:
+            for neighbor in neighbors[i]:
 
                 dx,dy = verts[neighbor] - xc
                 dV = V[neighbor] - Vc
@@ -637,7 +637,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
         A = np.empty(shape=[2,2],dtype = float)
         Ainv = np.empty(shape=[2,2],dtype = float)
         b = np.empty(shape=[2,4],dtype = float)
-        #todo build connectivity
+        #todo build neighbors
 
 
         for i in range(nverts):
@@ -646,7 +646,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             xc = verts[i,:]
             Vc = V[i,:]
 
-            for neighbor in connectivity[i]:
+            for neighbor in neighbors[i]:
                 if(status[neighbor] ):
 
                     dx,dy = verts[neighbor] - xc

@@ -5,25 +5,55 @@ from Structure import Structure
 
 
 def _box_intersect(box1, box2):
-    # lazy intersection
-    # mincorner: box[0], box[1]
-    # maxcorner: box[2], box[3]
+    """
+    lazy intersection box intersection
+
+    Args:
+        box1: a list of 4 float, mincorner: box[0], box[1] , maxcorner: box[2], box[3]
+        box2: a list of 4 float, mincorner: box[0], box[1] , maxcorner: box[2], box[3]
+
+    Returns:
+        bool: True, if two boxes lazily intersect, else False
+
+    """
     return (box1[0] <= box2[2] and box1[1] <= box2[3] and box2[0] <= box1[2] and box2[1] <= box1[3])
 
 
-def _box_candidate(box1, boxes, candidate):
+def _box_candidate(box1, boxes, candidates):
+    """
+    find box in boxes which lazily intersects box1
+
+    Args:
+        box1: a list of 4 float, mincorner: box[0], box[1] , maxcorner: box[2], box[3]
+        boxes: a list of box(4 float box)
+        candidates: an empty list of int
+
+    Returns:
+        bool: True, if there is box in boxes lazily intersect box1, else False
+        append the their box ids, which lazily intersect box1, to candidates
+
+    """
+
     i = 0;
     for x1, y1, x2, y2 in boxes:
         if (box1[0] <= x2 and box1[1] <= y2 and x1 <= box1[2] and y1 <= box1[3]):
-            candidate.append(i)
+            candidates.append(i)
         i += 1
-    return False if not candidate else True
+    return False if not candidates else True
 
 
 def _compute_dist(p, x1, x2):
-    # compute the distance between vertex p, and segment (x1,x2)
-    # return distance,alpha
-    # the intersection point is (1-alpha) * x1 + alpha*x2
+    """
+    compute the distance between vertex p, and segment (x1,x2), the closest point x1 + alpha*(x2-x1)
+
+    Args:
+        p:  2d numpy vector
+        x1: 2d numpy vector
+        x2: 2d numpy vector
+
+    Returns:
+        the distance between vertex p, and segment (x1,x2) and closest point location alpha
+    """
 
     cross = np.dot(x2 - x1, p - x1);
     if (cross <= 0):  # P X1 X2 is obtuse angle
@@ -40,10 +70,19 @@ def _compute_dist(p, x1, x2):
 
 
 def _line_intersect(x1, x2, y1, y2):
-    # compute the intersection of line x1,x2 and line y1,y2
-    # (1-alpha)*x1 + alpha*x2 = (1-beta)*y1 + beta*y2
-    # x1 + alpha*(x2-x1) = y1 + beta*(y2-y1)
-    # return intersect, alpha, beta
+    """
+    compute the intersection point of line x1,x2 and line y1,y2, the intersection point is (1-alpha)*x1 + alpha*x2 = (1-beta)*y1 + beta*y2
+
+    Args:
+        x1: 2d numpy vector, first node of segment one
+        x2: 2d numpy vector, second node of segment one
+        y1: 2d numpy vector, first node of segment two
+        y2: 2d numpy vector, second node of segment two
+
+    Returns:
+        float alpha and float beta
+
+    """
 
     A = [[x2[0] - x1[0], y1[0] - y2[0]], [x2[1] - x1[1], y1[1] - y2[1]]]
     b = [y1[0]] - x1[0], y1[1] - x1[1]
@@ -75,43 +114,75 @@ def _line_intersect(x1, x2, y1, y2):
 
 class Intersector:
     def __init__(self, fluid, structure):
-        '''
-        ########################################################################################
-        #######       NAME TABLE
-        ########################################################################################
-        bounding_boxes: float[nverts,4], bounding box of vert and its neighbors, as x_min, y_min, x_max,y_max
-        connectivity: ref, fluid vert connectivity
+        """
+        construct intersector
 
-        edge_center_stencil : (int,int,float)[nedges], for those ghost edge center which has one ghost node, its stencil as dante's definition and
-        its intersection on the stencil
+        Args:
+            fluid: Fluid_Domain class
+            structure: Structure class
 
-        edge_center_closest_position : (int float)[nedges] , for those ghost edge center which has one ghost node, its closest
-        structure edge and its position
+        Attributes:
+            bounding_boxes: float[number of fluid vertices, 4], a list of bounding boxes, for fluid nodes.
+                            Each box contains the fluid node and its neighbors, as x_min, y_min, x_max,y_max
 
-        ghost_node_closest_position : (int float)[nedges] , for those ghost nodes near IB, its closest structure edge and its position
+            candidates: list of structure edge list like [[],[],[]].  if node i is close to IB, candidates[i] is not empty,
+                        stores all structure edge id, structure edge j's bounding box intersects node i' bounding box
 
-        ghost_node_stencil : (int, int,float,int,int, float)[nedges], for those ghost nodes near IB, its stencil node numbers as dante's definition and
-        its intersection on the stencil, for both side,
-
-        is_close: bool[nverts], true if vert is close to immersed boundary
-        intersect_or_not: bool[nedges], true if the edge intersects with structure
-        intersect_result = float[nedges,2], save the intersection point information for fluid edge, first one left to right , second one right to left
-
-        nedges:int, fluid edge number
-        nedges:ref, fluid edges
-
-        nverts:int, fluid vert number
+            neighbors: reference, list of list fluid vertex neighbors, neighbors[i] contains node i 's neighbor nodes
 
 
-        struc_nedges:int, structure boundary edge number
-        struc_nverts:int, structure boundary vert number
-        struc_verts:ref, structure verts
-        struc_edges:ref, structure edges
+            edge_center_stencil : (int,int,float)[number of fluid edges], for those ghost edge center which has one ghost node,
+                                  its stencil as dante's definition and its intersection on the stencil
 
-        status_in_fluid: bool[nverts], true if the vert is in the fluid domain
-        status : bool[nverts], true if the vert's whole control volume is in the fluid domain
-        verts: ref, fluid verts coordinate
-        '''
+            edge_center_closest_position : (int float)[nedges] , for those ghost edge center which has one ghost node, its closest
+                                          structure edge and its position
+
+            ghost_node_closest_position : (int float)[nedges] , for those ghost nodes near IB, its closest structure edge and its position
+
+            ghost_node_stencil : (int, int,float,int,int, float)[nedges], for those ghost nodes near IB, saying xb its stencils node numbers
+                                 as dante's definition and its intersection on the stencil, for both side.  The first 3 number is for the first stencil,
+                                 which is on xs -> x_b side(the same side as x_b), here xs is the closest point at structure;  the second three number is for the second
+                                 stencil, which is on  x_b -> xs side(the opposite side of x_b).
+
+            is_close: bool[number of fluid vertices], true if vert is close to immersed boundary(its bounding box intersects with some structure edge bounding box)
+
+            intersect_or_not: bool[number of fluid edges], true if the fluid edge intersects with structure
+
+            intersect_result: float[number of fluid edges,2], save the intersection point information for fluid edges, saying fluid edge (x1, x2)
+                              alpha1 is for intersecting point from left to right, which is  x1 + alpha*(x2 - x1)
+                              alpha2 is for intersecting point from right to left, which is  x2 + alpha*(x1 - x2)
+
+            nedges:int, fluid edge number
+
+            edges: reference, float[number of fluid edges, 2] ,  fluid edge nodes
+
+            nverts:int, fluid vertex number
+
+            struc_box: float[4], the bounding box of structure
+
+            struc_nedges:int, structure boundary edge number
+
+            struc_nverts:int, structure boundary vertex number
+
+            struc_verts:reference, structure vertex coordinate
+
+            struc_edges:reference, structure edges
+
+            status_in_fluid: bool[number of fluid vertices], true if the vertex is in the fluid domain
+
+            status : bool[number of fluid vertices], true if the vertex's whole control volume is in the fluid domain
+
+            verts: edges: reference, float[number of fluid vertices, 2] ,  fluid vertex coordinates
+
+        Returns:
+            None
+            _build_fluid_bounding_boxes()
+            _build_close_node_result()
+            _build_intersect_result()
+            _initial_status()
+            _compute_HO_stencil()
+            _compute_ghost_stencil()
+        """
         self.edges = fluid.edges
         self.nedges = fluid.nedges
         self.elems = fluid.elems
@@ -119,8 +190,8 @@ class Intersector:
         self.verts = fluid.verts
         self.nverts = fluid.nverts
 
-        self.connectivity = fluid.connectivity
-        self.node_elem_connectivity = fluid.node_elem_connectivity
+        self.neighbors = fluid.neighbors
+        self.node_elem_neighbors = fluid.node_elem_neighbors
 
         self.bounding_boxes = np.empty(shape=[self.nverts, 4], dtype=float)
         self.struc_box = np.array([np.inf, np.inf, -np.inf, -np.inf], dtype=float)
@@ -129,7 +200,7 @@ class Intersector:
         self.struc_nverts = structure.nverts
         self.struc_verts = structure.verts
         self.struc_edges = structure.bounds
-        self.struc_normal = structure.edges_norm
+
 
         self.is_close = np.empty(shape=[self.nverts], dtype=bool)
         self.status_in_fluid = np.empty(shape=[self.nverts], dtype=bool)
@@ -143,8 +214,7 @@ class Intersector:
         self.edge_center_closest_position = np.empty(shape=[self.nedges], dtype='int, float')
 
         self.ghost_node_stencil = np.empty(shape=[self.nverts], dtype='int,int,float,int,int,float')
-        # the first stencil is xs -> x_b side, xs is the closest point at structure
-        # the second stencil is x_b xs side
+
         self.ghost_node_closest_position = np.empty(shape=[self.nedges], dtype='int, float')
 
         self._build_fluid_bounding_boxes()
@@ -152,16 +222,25 @@ class Intersector:
         self._build_intersect_result()
         self._initial_status()
         self._compute_HO_stencil()
-        #self._compute_ghost_stencil()
+        self._compute_ghost_stencil()
 
     def _build_fluid_bounding_boxes(self):
+        """
+        build fluid bounding boxes(self.bounding_boxes) and structure bounding box(self.struc_box)
+
+        Args:
+
+        Returns:
+
+
+        """
         print('start building bounding box')
         verts = self.verts
         bounding_boxes = self.bounding_boxes
         for i in range(self.nverts):
             box = bounding_boxes[i, :]
             box[0:2] = box[2:4] = verts[i, :]
-            for j in self.connectivity[i]:
+            for j in self.neighbors[i]:
                 x, y = verts[j, :]
                 if (x < box[0]):
                     box[0] = x
@@ -185,6 +264,15 @@ class Intersector:
         print('finish building bounding box')
 
     def _build_close_node_result(self):
+        """
+        find out all nodes closed to IB, and label them in is_close; construct candidates list for them, containing
+        its close structure edge id
+
+        Args:
+            None
+        Returns:
+            None
+        """
         print('start building close node result')
         bounding_boxes = self.bounding_boxes
         struc_box = self.struc_box
@@ -211,6 +299,16 @@ class Intersector:
         print('finish building close node result')
 
     def _build_intersect_result(self):
+        """
+        find all fluid edge, intersecting structure embedded surface, label them in intersect_or_not,
+        and save the intersection points for both side in intersect_result
+
+        Args:
+            None
+        Returns:
+            None
+
+        """
         print('start building intersect result')
 
         is_close = self.is_close
@@ -218,7 +316,6 @@ class Intersector:
         intersect_result = self.intersect_result
         intersect_or_not[:] = False
 
-        verts = self.verts
         for i in range(self.nedges):
             n1, n2 = self.edges[i, :]
             if (is_close[n1] and is_close[n2]):
@@ -235,6 +332,13 @@ class Intersector:
         print('finish building intersect result')
 
     def _build_intersect_result_helper(self, n1, n2):
+        """
+        compute fluid edge intersection information, fluid edge nodes n1 and n2
+
+        :param n1: fluid node number
+        :param n2: fluid node number
+        :return: alpha,the intersection point is x1 + alpha*(x2-x1)
+        """
         struc_verts = self.struc_verts
         min_alpha = np.inf
         cands = []
@@ -252,16 +356,25 @@ class Intersector:
             alpha, beta = _line_intersect(x1, x2, y1, y2)
             if (0 <= alpha <= 1 and 0 <= beta <= 1 and alpha < min_alpha):
                 min_alpha = alpha
+                min_beta = beta
         return min_alpha
 
     def _initial_status(self):
+        """
+        Initialize fluid state by flood filling method, assume the nodes at top are active
+
+        Args:
+            None
+        Returns:
+            None
+
+        """
         print('start initializing status')
         status = self.status
         status[:] = False
-        is_close = self.is_close
         intersect_or_not = self.intersect_or_not
         intersect_result = self.intersect_result
-        # flood fill method to initialize, assume the nodes at top are active
+
         # build connect set
         connect = [[] for i in range(self.nverts)]
         for i in range(self.nedges):
@@ -336,7 +449,7 @@ class Intersector:
 
         edge_center_stencil = self.edge_center_stencil
         edge_center_closest_position = self.edge_center_closest_position
-        connectivity = self.connectivity
+        neighbors = self.neighbors
 
         for i in range(self.nedges):
             n1,n2 = edges[i,:]
@@ -354,7 +467,7 @@ class Intersector:
 
                 for n in [n1,n2]:
                     x1 = verts[n]
-                    for m in connectivity[n]:
+                    for m in neighbors[n]:
                         if(not status[n] and not status[m]): # ignore stencil with 2 inactive nodes
                             continue
                         x2 = verts[m]
@@ -432,7 +545,6 @@ class Intersector:
 
         x_s = (1 - s_alpha) * s_xl + s_alpha * s_xr
 
-        s_normal = self.struc_normal[s_i]
 
         min_alpha = [np.inf, np.inf]
 
@@ -442,20 +554,19 @@ class Intersector:
 
         stencil_status = [False, False]
 
-        connectivity = self.connectivity
-        node_elem_connectivity = self.node_elem_connectivity
+        neighbors = self.neighbors
+        node_elem_neighbors = self.node_elem_neighbors
         status = self.status
         verts = self.verts
         elems = self.elems
 
         for n in nodes:
 
-            direction = s_normal[0] * (x_b[0] - x_s[0]) + s_normal[1] * (x_b[1] - x_s[1])
 
             stencil_status[:] = False, False
 
-            for neigh in connectivity[n]:
-                for ele in node_elem_connectivity[neigh]:
+            for neigh in neighbors[n]:
+                for ele in node_elem_neighbors[neigh]:
                     ele_node = elems[ele]
                     for i in range(-1, 2):
                         n1, n2 = ele_node[i], ele_node[i + 1]
