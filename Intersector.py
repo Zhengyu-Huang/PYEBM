@@ -227,7 +227,7 @@ class Intersector:
         self._initial_status_in_fluid()
         self._initial_status()
         self._compute_HO_stencil()
-        self._compute_ghost_stencil()
+        #self._compute_ghost_stencil()
 
     def _build_fluid_bounding_boxes(self):
         """
@@ -655,7 +655,6 @@ class Intersector:
         nverts = self.nverts
 
         struc_nedges = self.struc_nedges
-        struc_nverts = self.struc_nverts
         struc_verts = self.struc_verts
         struc_edges = self.struc_edges
 
@@ -679,7 +678,7 @@ class Intersector:
             for n in range(nverts):
                 if is_close[n]:
                     x, y = verts[n]
-                    plt.plot(x, y, 'ok')
+                    plt.text(x, y, '%d' % n, color='blue')
 
         if (edge_center_stencil):
             for i in range(nedges):
@@ -757,7 +756,7 @@ class Intersector:
             # active vertex blue; inactive vertex red
             for n in range(nverts):
                 x, y = verts[n]
-                plt.text(x, y, '%d' % n, 'b')
+                plt.text(x, y, '%d' % n, color = 'blue')
 
         if (node_status):
 
@@ -771,7 +770,11 @@ class Intersector:
                 else:
                     plt.text(x, y, '%d' % n, color='red')
 
+
+        plt.plot(6.437090834461008E-003,  1.379196849525051E-002,'or')
+
         plt.axis([-2, 2, -2, 2])
+
         plt.show()
 
 
@@ -783,5 +786,5 @@ if __name__ == "__main__":
 
     #draw(self, node_status=False, node_number=False, edge_center_stencil=False, ghost_stencil=False,close_points=False)
 
-    intersector.draw(False, False, False, True,False)
-    intersector.draw(False, False, True, False, False)
+    intersector.draw(False, False, False, False,False)
+    #intersector.draw(False, False,  False, False, False)

@@ -42,6 +42,11 @@ class Structure:
 
 
     def _construct_norm(self):
+        '''
+        The norm direction is toward the center of the structure, because the
+        structure edge is clockwise
+        :return:
+        '''
         bounds = self.bounds
         verts = self.verts
         edges_norm = self.edges_norm

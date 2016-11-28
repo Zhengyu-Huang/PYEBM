@@ -37,6 +37,10 @@ class Io_Data():
 
                  elif(lines[0] == "gamma"):
                      self.gamma = float(lines[1])
+
+                 elif (lines[0] == "CFL"):
+                     self.CFL = float(lines[1])
+
                  elif(lines[0] == "Prandtl"):
                      self.Prandtl = float(lines[1])
 

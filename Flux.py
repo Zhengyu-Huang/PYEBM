@@ -371,12 +371,20 @@ def _Steger_Warming(prim_l, W_oo, k, eos):
 
 
 def _Riemann_bWstar_FS(V,vv_wall,nn_wall,eos,equation_type):
-    #This is 1-d case
-# w_l is the fluid state variable
-# v is the piston or wall speed
-# fluid_normal is the normal of the fluid interface
-# if fluid_normal = 1 piston is on the right
-# if fluid_normal =-1 piston is on the left
+    """
+    This is Piston Riemann Problem
+
+    Args:
+       V: fluid state primitive variables rho, u_x, u_y, p, at the wall, float[4]
+       vv_wall: wall velocity, float[3]
+       nn_wall: woll outward normal, normal direction is away from fluid float[3]
+       eos: equation of state
+       equation_type: Euler or NavierStokes
+
+    Returns:
+
+    """
+
 
     nn_wall = nn_wall/np.linalg.norm(nn_wall)
     gamma = eos.gamma;
@@ -386,7 +394,7 @@ def _Riemann_bWstar_FS(V,vv_wall,nn_wall,eos,equation_type):
 
     vn_wall = vv_wall[0]*nn_wall[0] + vv_wall[1]*nn_wall[1]
 
-    if(vn_wall > vn):
+    if(vn > vn_wall):
         #print "Shock Wave FSRiemann"
         a = 2/((gamma + 1)*rho);
         b = p*(gamma - 1)/(gamma + 1)
@@ -398,7 +406,7 @@ def _Riemann_bWstar_FS(V,vv_wall,nn_wall,eos,equation_type):
     else:
         #print "Rarefactions FSRiemann"
         c = np.sqrt(gamma*p/rho);
-        p_R = p*(-(gamma - 1)/(2*c)*(vn - vn_wall) + 1)**(2*gamma/(gamma - 1))
+        p_R = p*(-(gamma - 1)/(2*c)*(vn_wall - vn) + 1)**(2*gamma/(gamma - 1))
         rho_R = rho*(p_R/p)**(1/gamma);
 
     if(equation_type == "Euler"):

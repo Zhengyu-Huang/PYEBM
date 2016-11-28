@@ -19,7 +19,7 @@ def _conser_to_pri_all(W, V):
     V[:, 3] = (W[:, 3] - 0.5 * W[:, 1] * V[:, 1] - 0.5 * W[:, 2] * V[:, 2]) * (gamma - 1.0)
 
 
-mesh = "/home/zhengyuh/Independence/2D_IBs_Euler-NS/TESTS/NacaBF/Visc/naca_00099.dat"
+mesh = "/home/zhengyuh/Independence/2D_IBs_Euler-NS/TESTS/EulerNaca/domain_00099.dat"
 
 
 
@@ -49,7 +49,7 @@ fid.close()
 
 W = np.empty(shape= (n,4), dtype = float)
 _pri_to_conser_all(V,W)
-np.save("nacaW_viscid_dante",W)
+np.save("euler_IB_dante",W)
 
 
 W_me = np.load("nacaW.npy")
