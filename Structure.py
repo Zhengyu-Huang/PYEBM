@@ -90,6 +90,9 @@ class Structure:
 
         return x_p, v_p, norm_p
 
+    def _temperature(self,i, alpha):
+        return 1
+
 
 
 #struc = Structure('plate.fgrid')

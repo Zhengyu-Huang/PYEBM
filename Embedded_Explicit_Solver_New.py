@@ -6,15 +6,42 @@ from Explicit_Solver import Explicit_Solver
 from Fluid_Domain import *
 
 
+def _interpolation(x_1, y_1, x_2, y_2, x_3):
+
+    d = (x_2[0] - x_1[0])**2 + (x_2[1] - x_1[1])**2
+
+    assert(d > 1e-10)
+
+    alpha = (x_3[0] - x_1[0])**2 + (x_3[1] - x_1[1])**2 / d
+
+    l = len(y_1)
+
+    return [y_1[i] + alpha*(y_2[i] - y_1[i]) for i in range(l)]
+
 
 #############################################################################################################################
 #############################################################################################################################
 #############################################################################################################################
 class Embedded_Explicit_Solver(Explicit_Solver):
     def __init__(self, fluid_domain, structure, io_data):
+        """
+        Initialize Embedded Explicit Solver
+
+        Args:
+            fluid_domain:  Fluid_Domain class
+            structure:     Structure class
+            io_data:       Input information
+
+        Attributes:
+            intersector: save fluid embedded surface intersection information
+            ghost_node: save ghost node variables vx, vy, T ; vx , vy, T the first ghost value is on the same side
+            with the fluid node(interpolating with the first ghost_node_stencil);
+            the second ghost value is on the other side(interpolating with the first ghost_node_stencil);
+        """
         super().__init__(fluid_domain,  io_data)
         self.structure = structure
         self.intersector = Intersector(self.fluid_domain, self.structure)
+        self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts,6],dtype=float)
 
 
 
@@ -80,8 +107,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
         for i in range(fluid.nedges):
 
             n, m = fluid.edges[i, :]
-            if(n == 2484 or m == 2484):
-                print('stop')
+
 
             v_n, v_m = V[n, :], V[m, :]
 
@@ -173,16 +199,18 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
 
 
-    def _fem_ghost_node_update(self, V, num_side):
+    def _fem_ghost_node_update(self, V):
         # update ghost value of node n
-        nverts = self.nverts
-        verts = self.verts
+        nverts = self.fluid_domain.nverts
+        verts = self.fluid_domain.verts
 
         ghost_node_stencil = self.intersector.ghost_node_stencil
-        ghost_node_closest_points = self.intersector.ghost_node_closest_position
+        ghost_node_closest_position = self.intersector.ghost_node_closest_position
+
+        ghost_nodes = self.ghost_nodes
 
         for n in range(nverts):
-            for side in range(num_side):
+            for side in range(2):
                 n_p,n_q,beta = ghost_node_stencil[n][3*side],ghost_node_stencil[n][3*side+1], ghost_node_stencil[n][3*side+2]
                 if(n_p < 0 and n_q < 0):
                     continue
@@ -196,11 +224,11 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                 x_c = (1 - beta)*x_p + beta*x_q
 
 
-                xs_info = ghost_node_closest_points[n]
+                xs_info , s_alpha= ghost_node_closest_position[n]
 
-                x_s, vv_wall, nn_wall = self.structure._point_info(xs_info)
+                x_s, vv_wall, nn_wall = self.structure._point_info(xs_info, s_alpha)
 
-                T_wall = self.structure._temperature(xs_info)
+                T_wall = self.structure._temperature(xs_info,s_alpha)
 
 
                 if(n_p >= 0 and n_q >= 0):
@@ -211,24 +239,22 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
                     v = V[n_p, :] if n_p > -1 else V[n_q, :]
 
-                    dv = gradient_V[n_p, :] if n_p > -1 else gradient_V[n_q, :]
+                    dv = self.gradient_V[n_p, :] if n_p > -1 else self.gradient_V[n_q, :]
 
                     v_c = v + np.dot(x_b - x_c, dv)
 
 
-                ghost_node[n, 3*side:3*side+3] = _ghost_interpolation(x_c, v_c,  x_b,  x_s, vv_wall,T_wall)
+                u_c = [v_c[1],v_c[2],self.eos._compute_temperature(v_c)]
+                u_wall = [vv_wall[0],vv_wall[1],T_wall]
+                ghost_nodes[n, 3*side:3*side+3] = _interpolation(x_c, u_c, x_s, u_wall, x_b)
                 #todo dante uses high order interpolation in IB_drive:f90:set_FEM_points
+
+
+
 
         return;
 
-    def _ghost_interpolation(x_c, v_c,  x_b,  x_s, vv_wall, T_wall):
-        vx_c,vy_c,T_c = v_c[1],v_c[2], eos._compute_temperature(v_c)
-        vx_s,vy_s,T_s = vv_wall[0],vv_wall[1], T_wall
 
-        alpha = np.dot(x_c - x_s,x_b - x_s)/np.dot(x_c - x_s,x_c - x_s)
-
-
-        return vx_s + alpha*(vx_c - vx_s),vy_s + alpha*(vy_c - vy_s), T_s + alpha*(T_c - T_s)
 
     def _viscid_flux_rhs_fem(self, V, R):
         eos = self.eos
@@ -236,16 +262,22 @@ class Embedded_Explicit_Solver(Explicit_Solver):
         elems = self.fluid_domain.elems
         elem_edge_neighbors = self.fluid_domain.elem_edge_neighbors
         shape_function_gradient = self.fluid_domain.shape_function_gradient
+        area = self.fluid_domain.area
+        edges = self.fluid_domain.edges
         intersect_or_not = self.intersector.intersect_or_not
         status = self.intersector.status
+
+
+
+        self._fem_ghost_node_update(V)
         ghost_nodes = self.ghost_nodes
-        area = self.fluid_domain.area
+
 
         tau = np.empty([2, 2], dtype=float)
         F_vis = np.empty(4, dtype=float)
         G_vis = np.empty(4, dtype=float)
 
-        ele_V = np.empty([3,4],dtype=float)
+        ele_V = np.empty([3,3],dtype=float)
         for e in range(nelems):
 
             n1, n2, n3 = elems[e, :]
@@ -261,12 +293,12 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             inactive_side = set()
 
             for i in elem_edge_neighbors[e]:
-                    if(intersect_or_not[i]):
-                        for m1,m2 in edges[i]:
-                            if status[m1] and not status[m2]:
-                                inactive_side.add(m2)
-                            elif status[m2] and not status[m1]:
-                                inactive_side.add(m1)
+                if(intersect_or_not[i]):
+                    m1,m2 = edges[i]
+                    if status[m1] and not status[m2]:
+                        inactive_side.add(m2)
+                    elif status[m2] and not status[m1]:
+                        inactive_side.add(m1)
 
             for local_i in range(3):
                 n = elems[e, local_i]

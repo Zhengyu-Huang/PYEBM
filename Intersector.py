@@ -227,7 +227,7 @@ class Intersector:
         self._initial_status_in_fluid()
         self._initial_status()
         self._compute_HO_stencil()
-        #self._compute_ghost_stencil()
+        self._compute_ghost_stencil()
 
     def _build_fluid_bounding_boxes(self):
         """

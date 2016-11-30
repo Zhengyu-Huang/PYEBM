@@ -39,7 +39,7 @@ def main():
     # read fluid grid & construct fluid grid data
 
 
-    io_data = Io_Data("../Test/EulerNaca/naca.input")
+    io_data = Io_Data("../Test/IBNaca/naca.input")
     fluid_input = io_data.fluidmesh
     structure_input = io_data.structuremesh
 
