@@ -41,8 +41,8 @@ class Embedded_Explicit_Solver(Explicit_Solver):
         super().__init__(fluid_domain,  io_data)
         self.structure = structure
         self.intersector = Intersector(self.fluid_domain, self.structure)
-        #self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 6],dtype=float)
-        self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 8], dtype=float)
+        #self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 8],dtype=float)
+        self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 6], dtype=float)
 
 
 
@@ -109,8 +109,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
             n, m = fluid.edges[i, :]
 
-            if (n == 610 and m == 2230):
-                print('stop')
+
 
 
 
@@ -254,12 +253,15 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
                     dv_c = dv
 
-                '''
+
                 u_c = [v_c[1],v_c[2],self.eos._compute_temperature(v_c)]
                 u_wall = [vv_wall[0],vv_wall[1],T_wall]
                 ghost_nodes[n, 3*side:3*side+3] = _interpolation(x_c, u_c, x_s, u_wall, x_n)
-                #todo dante uses high order interpolation in IB_drive:f90:set_FEM_points
+
+
                 '''
+                #todo dante uses high order interpolation in IB_drive:f90:set_FEM_points
+
                 eta = np.linalg.norm(x_n - x_c)
                 xi = np.linalg.norm(x_s - x_c)
                 Dr = (x_s-x_c)/xi
@@ -283,6 +285,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                 g[3] = ghost_T *g[0]/self.eos.gamma
 
                 ghost_nodes[n, 4 * side:4 * side + 4] = g
+                '''
 
 
 
@@ -336,7 +339,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                         inactive_side.add(m2)
                     elif status[m2] and not status[m1]:
                         inactive_side.add(m1)
-            '''
+
             for local_i in range(3):
                 n = elems[e, local_i]
                 if (status[n]):
@@ -347,8 +350,8 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                         ele_V[local_i, :] = ghost_nodes[n,3:6]
                     else:
                         ele_V[local_i, :] = ghost_nodes[n,0:3]
-            '''
 
+            '''
             ele_V2 = np.empty([3, 4], dtype=float)
             for local_i in range(3):
                 n = elems[e, local_i]
@@ -360,7 +363,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                         ele_V2[local_i, :] = ghost_nodes[n, 4:8]
                     else:
                         ele_V2[local_i, :] = ghost_nodes[n, 0:4]
-
+            '''
 
 
 
@@ -371,16 +374,16 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             # Compute velocity gradients, temperature gradients, store in d_v
             #####################
 
-            '''
+
             vx1, vy1, T1 = ele_V[0, :]
             vx2, vy2, T2 = ele_V[1, :]
             vx3, vy3, T3 = ele_V[2, :]
-            '''
 
+            '''
             vx1, vy1, T1 = ele_V2[0, 1],ele_V2[0, 2], self.eos._compute_temperature(ele_V2[0,:])
             vx2, vy2, T2 = ele_V2[1, 1],ele_V2[1, 2], self.eos._compute_temperature(ele_V2[1,:])
             vx3, vy3, T3 = ele_V2[2, 1],ele_V2[2, 2], self.eos._compute_temperature(ele_V2[2,:])
-
+            '''
 
 
             vx, vy, T = (vx1 + vx2 + vx3) / 3.0, (vy1 + vy2 + vy3) / 3.0, (T1 + T2 + T3) / 3.0
@@ -397,7 +400,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             ########################################################
             # Test dante's dT/dx and dT/dy
             #######################################################
-
+            '''
             rho1,rho2,rho3 = ele_V2[0,0], ele_V2[1,0], ele_V2[2,0]
             p1, p2, p3 = ele_V2[0,3], ele_V2[1,3], ele_V2[2,3]
             rho = (rho1 + rho2 + rho3)/3.0
@@ -408,7 +411,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             dT_dx, dT_dy = dT_drho *drho_dx + dT_dp*dp_dx, dT_drho *drho_dy + dT_dp*dp_dy
 
             d_v[2,:] = [dT_dx, dT_dy]
-
+            '''
 
             #############################################
             # compute viscosity, heat conductivity
