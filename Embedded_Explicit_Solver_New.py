@@ -41,7 +41,8 @@ class Embedded_Explicit_Solver(Explicit_Solver):
         super().__init__(fluid_domain,  io_data)
         self.structure = structure
         self.intersector = Intersector(self.fluid_domain, self.structure)
-        self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts,6],dtype=float)
+        #self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 6],dtype=float)
+        self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 8], dtype=float)
 
 
 
@@ -108,6 +109,10 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
             n, m = fluid.edges[i, :]
 
+            if (n == 610 and m == 2230):
+                print('stop')
+
+
 
             v_n, v_m = V[n, :], V[m, :]
 
@@ -143,6 +148,8 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                 R[n, :] -= flux
             if m_active:
                 R[m, :] += flux
+
+
 
     def SIV(self, V, i, limiter = None):
         # p---c----q
@@ -215,7 +222,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                 if(n_p < 0 and n_q < 0):
                     continue
 
-                x_b = verts[n]
+                x_n = verts[n]
 
                 x_p = verts[n_p]
 
@@ -235,19 +242,48 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
                     v_c = (1.0 - beta) * V[n_p, :] + beta * V[n_q, :]
 
+                    dv_c = (1.0 - beta) * self.gradient_V[n_p, :] + beta * self.gradient_V[n_q, :]
+
                 else:
 
                     v = V[n_p, :] if n_p > -1 else V[n_q, :]
 
                     dv = self.gradient_V[n_p, :] if n_p > -1 else self.gradient_V[n_q, :]
 
-                    v_c = v + np.dot(x_b - x_c, dv)
+                    v_c = v + np.dot(x_n - x_c, dv)
 
+                    dv_c = dv
 
+                '''
                 u_c = [v_c[1],v_c[2],self.eos._compute_temperature(v_c)]
                 u_wall = [vv_wall[0],vv_wall[1],T_wall]
-                ghost_nodes[n, 3*side:3*side+3] = _interpolation(x_c, u_c, x_s, u_wall, x_b)
+                ghost_nodes[n, 3*side:3*side+3] = _interpolation(x_c, u_c, x_s, u_wall, x_n)
                 #todo dante uses high order interpolation in IB_drive:f90:set_FEM_points
+                '''
+                eta = np.linalg.norm(x_n - x_c)
+                xi = np.linalg.norm(x_s - x_c)
+                Dr = (x_s-x_c)/xi
+                g =[v_c[0],0.,0.,0.]
+                coeff_3 = v_c[1]
+                coeff_2 = np.dot(dv_c[:,1],Dr)
+                coeff_1 = (vv_wall[0] - coeff_3 - coeff_2*xi)/xi**2
+                g[1] = coeff_1*eta**2 + coeff_2*eta + coeff_3
+
+                coeff_3 = v_c[2]
+                coeff_2 = np.dot(dv_c[:, 2], Dr)
+                coeff_1 = (vv_wall[1] - coeff_3 - coeff_2 * xi) / xi ** 2
+                g[2] = coeff_1 * eta ** 2 + coeff_2 * eta + coeff_3
+
+                coeff_3 = self.eos._compute_temperature(v_c)
+                dT_drho, dT_dp = -self.eos.gamma * v_c[3] / (v_c[0] ** 2), self.eos.gamma / v_c[0]
+                dT_dx, dT_dy = dT_drho * dv_c[:, 0] + dT_dp * dv_c[:, 3]
+                coeff_2 = dT_dx *Dr[0] + dT_dy*Dr[1]
+                coeff_1 = (T_wall - coeff_3 - coeff_2 * xi) / xi ** 2
+                ghost_T = coeff_1 * eta ** 2 + coeff_2 * eta + coeff_3
+                g[3] = ghost_T *g[0]/self.eos.gamma
+
+                ghost_nodes[n, 4 * side:4 * side + 4] = g
+
 
 
 
@@ -282,6 +318,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
             n1, n2, n3 = elems[e, :]
 
+
             ###########################################
             # ghost value update
             ###################################################
@@ -299,7 +336,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                         inactive_side.add(m2)
                     elif status[m2] and not status[m1]:
                         inactive_side.add(m1)
-
+            '''
             for local_i in range(3):
                 n = elems[e, local_i]
                 if (status[n]):
@@ -310,6 +347,19 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                         ele_V[local_i, :] = ghost_nodes[n,3:6]
                     else:
                         ele_V[local_i, :] = ghost_nodes[n,0:3]
+            '''
+
+            ele_V2 = np.empty([3, 4], dtype=float)
+            for local_i in range(3):
+                n = elems[e, local_i]
+                if (status[n]):
+                    ele_V2[local_i, :] = V[n, :]
+                else:
+
+                    if n in inactive_side:
+                        ele_V2[local_i, :] = ghost_nodes[n, 4:8]
+                    else:
+                        ele_V2[local_i, :] = ghost_nodes[n, 0:4]
 
 
 
@@ -321,10 +371,17 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             # Compute velocity gradients, temperature gradients, store in d_v
             #####################
 
-
+            '''
             vx1, vy1, T1 = ele_V[0, :]
             vx2, vy2, T2 = ele_V[1, :]
             vx3, vy3, T3 = ele_V[2, :]
+            '''
+
+            vx1, vy1, T1 = ele_V2[0, 1],ele_V2[0, 2], self.eos._compute_temperature(ele_V2[0,:])
+            vx2, vy2, T2 = ele_V2[1, 1],ele_V2[1, 2], self.eos._compute_temperature(ele_V2[1,:])
+            vx3, vy3, T3 = ele_V2[2, 1],ele_V2[2, 2], self.eos._compute_temperature(ele_V2[2,:])
+
+
 
             vx, vy, T = (vx1 + vx2 + vx3) / 3.0, (vy1 + vy2 + vy3) / 3.0, (T1 + T2 + T3) / 3.0
 
@@ -340,9 +397,9 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             ########################################################
             # Test dante's dT/dx and dT/dy
             #######################################################
-            '''
-            rho1,rho2,rho3 = V[n1,0], V[n2,0], V[n3,0]
-            p1, p2, p3 = V[n1,3], V[n2,3], V[n3,3]
+
+            rho1,rho2,rho3 = ele_V2[0,0], ele_V2[1,0], ele_V2[2,0]
+            p1, p2, p3 = ele_V2[0,3], ele_V2[1,3], ele_V2[2,3]
             rho = (rho1 + rho2 + rho3)/3.0
             p = (p1 + p2 + p3)/3.0
             dT_drho, dT_dp = -eos.gamma*p/(rho**2), eos.gamma/rho
@@ -351,7 +408,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             dT_dx, dT_dy = dT_drho *drho_dx + dT_dp*dp_dx, dT_drho *drho_dy + dT_dp*dp_dy
 
             d_v[2,:] = [dT_dx, dT_dy]
-            '''
+
 
             #############################################
             # compute viscosity, heat conductivity
@@ -379,6 +436,8 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             R[n1, :] += e_area * d_shape[0, 0] * F_vis + e_area * d_shape[1, 0] * G_vis
             R[n2, :] += e_area * d_shape[0, 1] * F_vis + e_area * d_shape[1, 1] * G_vis
             R[n3, :] += e_area * d_shape[0, 2] * F_vis + e_area * d_shape[1, 2] * G_vis
+
+
 
 
     def _apply_wall_boundary_condition(self, W):

@@ -634,6 +634,7 @@ class Intersector:
         ghost_node_stencil = self.ghost_node_stencil
 
         for n in range(nverts):
+            ghost_node_stencil[n] = -1,-1,0.0,-1,-1,0.0
 
             if (not is_close[n] or status[n]):  # skip these active or far from IB nodes
                 continue
@@ -728,6 +729,7 @@ class Intersector:
 
                 plt.plot(x_n[0], x_n[1], 'ok')
 
+
                 for i in range(2):
                     n_p, n_q, alpha = self.ghost_node_stencil[n][3 * i], self.ghost_node_stencil[n][3 * i + 1], \
                                       self.ghost_node_stencil[n][3 * i + 2]
@@ -737,9 +739,12 @@ class Intersector:
 
                     x_p, x_q = verts[n_p], verts[n_q]
 
+
+
                     x_stencil = (1 - alpha) * x_p + alpha * x_q
 
                     plt.plot([x_s[0], x_n[0], x_stencil[0]], [x_s[1], x_n[1], x_stencil[1]], color='k')
+
 
                     if (i == 0):
                         plt.plot(x_stencil[0], x_stencil[1], 'ok')
@@ -771,7 +776,7 @@ class Intersector:
                     plt.text(x, y, '%d' % n, color='red')
 
 
-        plt.plot(6.437090834461008E-003,  1.379196849525051E-002,'or')
+
 
         plt.axis([-2, 2, -2, 2])
 
@@ -779,12 +784,12 @@ class Intersector:
 
 
 if __name__ == "__main__":
-    fluid = Fluid_Domain('../Test/EulerNaca/domain')
-    structure = Structure('../Test/EulerNaca/naca')
+    fluid = Fluid_Domain('../Test/IBNaca/domain')
+    structure = Structure('../Test/IBNaca/naca')
     intersector = Intersector(fluid, structure)
     # intersector.draw(True,  False)
 
     #draw(self, node_status=False, node_number=False, edge_center_stencil=False, ghost_stencil=False,close_points=False)
 
-    intersector.draw(False, False, False, False,False)
+    intersector.draw(False, False, False, True,True)
     #intersector.draw(False, False,  False, False, False)

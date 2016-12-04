@@ -81,7 +81,7 @@ class Explicit_Solver:
             W[i,:] = self.W_oo
 
         self._apply_wall_boundary_condition(W)
-        self.W = np.load("ns_IB_dante_lim1.npy")
+        self.W = np.load("ns_IB_dante_lim11.npy")
 
 
 
