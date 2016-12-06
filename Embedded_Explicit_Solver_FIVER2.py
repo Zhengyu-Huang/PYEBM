@@ -109,10 +109,6 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
             n, m = fluid.edges[i, :]
 
-
-
-
-
             v_n, v_m = V[n, :], V[m, :]
 
             n_active, m_active = status[n], status[m]
@@ -436,49 +432,13 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             G_vis[:] = 0, -tau[0, 1], -tau[1, 1], -tau[0, 1] * vx - tau[1, 1] * vy - tem_k * d_v[2, 1]
 
             e_area = area[e]
-            if status[n1]:
-                R[n1, :] += e_area * d_shape[0, 0] * F_vis + e_area * d_shape[1, 0] * G_vis
-            if status[n2]:
-                R[n2, :] += e_area * d_shape[0, 1] * F_vis + e_area * d_shape[1, 1] * G_vis
-            if status[n3]:
-                R[n3, :] += e_area * d_shape[0, 2] * F_vis + e_area * d_shape[1, 2] * G_vis
-            if(n1 == 1643 or n2 == 1643 or n3 == 1643):
-                print(ele_V)
-                print(n1, n2, n3,  'flux is',  e_area * d_shape[0, 0] * F_vis + e_area * d_shape[1, 0] * G_vis, e_area * d_shape[0, 1] * F_vis + e_area * d_shape[1, 1] * G_vis, e_area * d_shape[0, 2] * F_vis + e_area * d_shape[1, 2] * G_vis)
+            R[n1, :] += e_area * d_shape[0, 0] * F_vis + e_area * d_shape[1, 0] * G_vis
+            R[n2, :] += e_area * d_shape[0, 1] * F_vis + e_area * d_shape[1, 1] * G_vis
+            R[n3, :] += e_area * d_shape[0, 2] * F_vis + e_area * d_shape[1, 2] * G_vis
 
 
 
 
-    def _apply_wall_boundary_condition(self, W):
-
-        fluid = self.fluid_domain
-
-        eos = self.eos
-
-        for i in range(fluid.nbounds):
-
-            n, m, e, type = fluid.bounds[i, :]
-
-            if (type == 3):  # slip wall
-                continue
-
-            if (type == 1):  # adiabatic_wall
-                vx_wall, vy_wall, T_wall = fluid.bc_cond[type, :]
-                W[m, 3] += 0.5 * W[n, 0] * (vx_wall ** 2 + vy_wall ** 2 - W[m, 1] ** 2 - W[m, 2] ** 2)
-                W[n, 3] += 0.5 * W[n, 0] * (vx_wall ** 2 + vy_wall ** 2 - W[n, 1] ** 2 - W[n, 2] ** 2)
-                W[n, 1:3] = W[n, 0] * vx_wall, W[n, 0] * vy_wall
-                W[m, 1:3] = W[m, 0] * vx_wall, W[m, 0] * vy_wall
-
-            elif (type == 0):  # isothermal_wall
-
-                vx_wall, vy_wall, T_wall = fluid.bc_cond[type, :]
-
-                W[n, 1:3] = W[n, 0] * vx_wall, W[n, 0] * vy_wall
-                W[m, 1:3] = W[m, 0] * vx_wall, W[m, 0] * vy_wall
-
-                e_wall = T_wall / (eos.gamma * (eos.gamma - 1)) + 0.5 * vx_wall ** 2 + 0.5 * vy_wall ** 2
-                W[n, 3] = W[n, 0] * e_wall
-                W[m, 3] = W[m, 0] * e_wall
 
     def _compute_local_time_step(self, V):
 

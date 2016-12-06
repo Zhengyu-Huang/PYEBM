@@ -130,16 +130,23 @@ class Explicit_Solver:
 
 
         W0 = W + k1*dt/control_volume;
+        print('W0',W0[1643,:])
 
 
 
         self._apply_wall_boundary_condition(W0);
 
+        print('W0', W0[1643, :])
+
         self._check_solution(W0);
+
+        print('W0', W0[1643, :])
 
         k2[:,:] = 0
 
         eos._conser_to_pri_all(W0,V)
+
+        print('V', V[1643, :])
 
         self._compute_RK_update(V, k2);
 
@@ -154,7 +161,7 @@ class Explicit_Solver:
 
         self._compute_residual(R,W)
 
-        self._draw_residual(R)
+        #self._draw_residual(R)
 
 
 
@@ -162,6 +169,7 @@ class Explicit_Solver:
     def _compute_RK_update(self, V, R):
 
         self._euler_flux_rhs(V, R)
+
 
 
         self._euler_boundary_flux(V, R)
@@ -172,7 +180,10 @@ class Explicit_Solver:
 
             self._viscid_flux_rhs_fem(V,R)
 
+
             self._viscid_boundary_flux_fem(V, R)
+        print(R[1625,:])
+
 
     def _lsq_gradient(self,V):
 
@@ -338,6 +349,12 @@ class Explicit_Solver:
                 R[m,:] -= Flux._Steger_Warming(prim_m, W_moo, dr_nm, eos)
 
                 R[n,:] -= Flux._Steger_Warming(prim_n, W_noo, dr_nm, eos)
+
+
+
+
+
+
 
     def _viscid_flux_rhs_fem(self,V,R):
         eos = self.eos
