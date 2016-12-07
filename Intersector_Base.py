@@ -113,7 +113,7 @@ def _line_intersect(x1, x2, y1, y2):
     return (A[1][1]*b[0] - A[0][1]*b[1])/delta, (-A[1][0]*b[0] + A[0][0]*b[1])/delta
 
 
-class Intersector:
+class Intersector_Base:
     def __init__(self, fluid, structure):
         """
         construct intersector
@@ -152,10 +152,11 @@ class Intersector:
             intersect_or_not: bool[number of fluid edges], true if the fluid edge intersects with structure
 
             intersect_result: (float, int, float, float, int , float)[number of fluid edges],
-                               alpha_1 ,s1, beta_1, alpha_2, s2, beta_2
+                              alpha_1 ,s1, beta_1 ,alpha_2 ,s2, beta_2
                               alpha, save the intersection point information for fluid edges, saying fluid edge (x1, x2)
-                              alpha1 is for intersecting point from left to right, which is  x1 + alpha*(x2 - x1), which is also the point (s1, beta1) on structure
-                              alpha2 is for intersecting point from right to left, which is  x2 + alpha*(x1 - x2), which is also the point (s2, beta2) on structure
+                              alpha1 is for intersecting point from left to right, which is  x1 + alpha1*(x2 - x1), which is also the point (s1, beta1) on structure
+                              alpha1 is for intersecting point from right to left, which is  x2 + alpha2*(x1 - x2), which is also the point (s2, beta2) on structure
+
 
 
 
@@ -214,7 +215,8 @@ class Intersector:
         self.status = np.empty(shape=[self.nverts], dtype=bool)
 
         self.intersect_or_not = np.empty(shape=[self.nedges], dtype=bool)
-        self.intersect_result = np.empty(shape=[self.nedges, 2], dtype=float)
+        self.intersect_result = np.empty(shape=[self.nedges], dtype='float,int,float,float,int,float')
+
 
         self.edge_center_stencil = np.empty(shape=[self.nedges], dtype='int,int,float')
 
@@ -230,8 +232,8 @@ class Intersector:
         self._build_connectivity()
         self._initial_status_in_fluid()
         self._initial_status()
-        self._compute_HO_stencil()
-        self._compute_ghost_stencil()
+        #self._compute_HO_stencil()
+        #self._compute_ghost_stencil()
 
     def _build_fluid_bounding_boxes(self):
         """
@@ -329,15 +331,15 @@ class Intersector:
             n1, n2 = self.edges[i, :]
             if (is_close[n1] and is_close[n2]):
 
-                alpha = self._build_intersect_result_helper(n1, n2)
+                alpha, s_i, s_beta = self._build_intersect_result_helper(n1, n2)
                 if (alpha != np.inf):
                     intersect_or_not[i] = True
-                intersect_result[i, 0] = alpha
+                    intersect_result[i][0], intersect_result[i][1],intersect_result[i][2] = alpha, s_i, s_beta
 
-                alpha = self._build_intersect_result_helper(n2, n1)
+                alpha, s_i, s_beta = self._build_intersect_result_helper(n2, n1)
                 if (alpha != np.inf):
                     intersect_or_not[i] = True
-                intersect_result[i, 1] = alpha
+                    intersect_result[i][3], intersect_result[i][4], intersect_result[i][5] = alpha, s_i, s_beta
         print('finish building intersect result')
 
     def _build_intersect_result_helper(self, n1, n2):
@@ -349,7 +351,7 @@ class Intersector:
         :return: alpha,the intersection point is x1 + alpha*(x2-x1)
         """
         struc_verts = self.struc_verts
-        min_alpha = np.inf
+        min_alpha , min_i, min_beta = np.inf, -1, 0.0
         cands = []
         for i in self.candidates[n1]:
             for j in self.candidates[n2]:
@@ -367,7 +369,7 @@ class Intersector:
                 min_alpha = alpha
                 min_beta = beta
                 min_i = i
-        return min_alpha
+        return min_alpha, min_i, min_beta
 
 
 
@@ -424,13 +426,10 @@ class Intersector:
         intersect_or_not = self.intersect_or_not
         intersect_result = self.intersect_result
         self.status = status = copy.copy(self.status_in_fluid)
-
-
-
         for i in range(self.nedges):
             if (intersect_or_not[i]):
                 n1, n2 = self.edges[i, :]
-                alpha_1, alpha_2 = intersect_result[i, :]
+                alpha_1, alpha_2 = intersect_result[i, 0],intersect_result[i, 3]
                 if (alpha_1 <= 0.5):
                     status[n1] = False
                 if (alpha_2 <= 0.5):
@@ -465,6 +464,70 @@ class Intersector:
 
         return min_dist, argmin_edge_id, min_alpha
 
+    '''
+    def _compute_HO_stencil_old(self):
+        status = self.status
+        verts = self.verts
+        edges = self.edges
+        struc_edges = self.struc_edges
+        struc_verts = self.struc_verts
+
+        self._compute_edge_center_closest_position()
+
+        edge_center_stencil = self.edge_center_stencil
+        edge_center_closest_position = self.edge_center_closest_position
+        neighbors = self.neighbors
+
+        for i in range(self.nedges):
+            n1,n2 = edges[i,:]
+            if((status[n1] and not status[n2]) or (status[n2] and not status[n1])):
+
+                x_c = 0.5*(verts[n1,:] + verts[n2,:])
+                struc_edge_id,struc_alpha = edge_center_closest_position[i]
+
+                n_s1,n_s2 = struc_edges[struc_edge_id]
+                x_b = (1 - struc_alpha)*struc_verts[n_s1] + struc_alpha*struc_verts[n_s2]
+
+                min_alpha = np.inf
+                stencil_status = False
+
+
+                for n in [n1,n2]:
+                    x1 = verts[n]
+                    for m in neighbors[n]:
+                        if(not status[n] and not status[m]): # ignore stencil with 2 inactive nodes
+                            continue
+                        x2 = verts[m]
+
+                        alpha,beta = _line_intersect(x_b,x_c,x1,x2)
+
+
+                        if(0 <= beta <= 1.0): # intersect the edge
+                            good_stencil = status[n] and status[m]
+
+
+                            if(good_stencil): # stencil has 2 active nodes
+                                if (not stencil_status or alpha < min_alpha ):
+                                    min_alpha = alpha
+                                    min_beta = beta
+                                    n_p,n_q = n,m
+                                    stencil_status = True
+
+                            elif(not stencil_status and alpha < min_alpha):# stencil has 1 active node
+
+                                min_alpha = alpha
+                                min_beta = beta
+                                n_p,n_q = n,m
+
+
+                if(min_alpha == np.inf):
+                    print("error in compute HO stencil")
+                edge_center_stencil[i] = n_p,n_q,min_beta
+
+                #x_s = x_b + min_alpha*(x_c - x_b)
+                #plt.plot([x_b[0],x_s[0]],[x_b[1],x_s[1]],color = 'y')
+        #plt.show()
+        '''
 
     def _compute_HO_stencil(self):
         print('starting computing HO stencil')

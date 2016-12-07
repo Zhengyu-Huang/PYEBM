@@ -81,7 +81,10 @@ class Explicit_Solver:
             W[i,:] = self.W_oo
 
         self._apply_wall_boundary_condition(W)
-        self.W = np.load("ns_IB_dante_lim11.npy")
+
+        self.W = np.load("./ns_IB_dante_lim11.npy")
+
+        #self.W = np.load("/home/zhengyuh/Dropbox/IB_2D/Test/NacaBF/Invisc/nacaW_inviscid1_dante.npy")
 
 
 
@@ -98,7 +101,7 @@ class Explicit_Solver:
 
             ite += 1
 
-            print("ite %d , residualt is %.10f , relative residual is %.10f" %(ite,self.res_L2, self.relative_res_L2))
+            print("ite %d , residual is %.10f , relative residual is %.10f" %(ite,self.res_L2, self.relative_res_L2))
 
             if(self.relative_res_L2 <= self.tol):
                 break
@@ -130,23 +133,23 @@ class Explicit_Solver:
 
 
         W0 = W + k1*dt/control_volume;
-        print('W0',W0[1643,:])
+
 
 
 
         self._apply_wall_boundary_condition(W0);
 
-        print('W0', W0[1643, :])
+
 
         self._check_solution(W0);
 
-        print('W0', W0[1643, :])
+
 
         k2[:,:] = 0
 
         eos._conser_to_pri_all(W0,V)
 
-        print('V', V[1643, :])
+
 
         self._compute_RK_update(V, k2);
 
@@ -182,7 +185,7 @@ class Explicit_Solver:
 
 
             self._viscid_boundary_flux_fem(V, R)
-        print(R[1625,:])
+
 
 
     def _lsq_gradient(self,V):

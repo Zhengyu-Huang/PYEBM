@@ -1,22 +1,9 @@
 from Limiter import *
 from Intersector import *
-from EOS import EOS
+import Utility
 import Flux
 from Explicit_Solver import Explicit_Solver
 from Fluid_Domain import *
-
-
-def _interpolation(x_1, y_1, x_2, y_2, x_3):
-
-    d = (x_2[0] - x_1[0])**2 + (x_2[1] - x_1[1])**2
-
-    assert(d > 1e-10)
-
-    alpha = (x_3[0] - x_1[0])**2 + (x_3[1] - x_1[1])**2 / d
-
-    l = len(y_1)
-
-    return [y_1[i] + alpha*(y_2[i] - y_1[i]) for i in range(l)]
 
 
 #############################################################################################################################
@@ -41,8 +28,8 @@ class Embedded_Explicit_Solver(Explicit_Solver):
         super().__init__(fluid_domain,  io_data)
         self.structure = structure
         self.intersector = Intersector(self.fluid_domain, self.structure)
-        #self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 8],dtype=float)
-        self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 6], dtype=float)
+        self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 8],dtype=float)
+        #self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 6], dtype=float)
 
 
 
@@ -141,7 +128,9 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
                 v_L = self.SIV(V, i,limiter)
 
+
             flux = Flux._Roe_flux(v_L, v_R, dr_nm, eos)
+
 
             if n_active:
                 R[n, :] -= flux
@@ -175,7 +164,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
         # Information of closest point on the structure
         struc_i, struc_alpha = self.intersector.edge_center_closest_position[i]
-        x_s, vv_wall, nn_wall = self.structure._point_info(struc_i, struc_alpha)
+        x_s, vv_wall, nn_wall = self.structure._point_info(struc_i, struc_alpha,x_b)
 
         # Construct x_c information, including primitive variable v_c, dv_c
         x_p, x_q = verts[n_p, :], verts[n_q, :]
@@ -232,7 +221,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
                 xs_info , s_alpha= ghost_node_closest_position[n]
 
-                x_s, vv_wall, nn_wall = self.structure._point_info(xs_info, s_alpha)
+                x_s, vv_wall, nn_wall = self.structure._point_info(xs_info, s_alpha, x_c)
 
                 T_wall = self.structure._temperature(xs_info,s_alpha)
 
@@ -253,10 +242,10 @@ class Embedded_Explicit_Solver(Explicit_Solver):
 
                     dv_c = dv
 
-
+                '''
                 u_c = [v_c[1],v_c[2],self.eos._compute_temperature(v_c)]
                 u_wall = [vv_wall[0],vv_wall[1],T_wall]
-                ghost_nodes[n, 3*side:3*side+3] = _interpolation(x_c, u_c, x_s, u_wall, x_n)
+                ghost_nodes[n, 3*side:3*side+3] = Utility._interpolation(x_c, u_c, x_s, u_wall, x_n)
 
 
                 '''
@@ -285,7 +274,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                 g[3] = ghost_T *g[0]/self.eos.gamma
 
                 ghost_nodes[n, 4 * side:4 * side + 4] = g
-                '''
+
 
 
 
@@ -339,7 +328,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                         inactive_side.add(m2)
                     elif status[m2] and not status[m1]:
                         inactive_side.add(m1)
-
+            '''
             for local_i in range(3):
                 n = elems[e, local_i]
                 if (status[n]):
@@ -350,8 +339,8 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                         ele_V[local_i, :] = ghost_nodes[n,3:6]
                     else:
                         ele_V[local_i, :] = ghost_nodes[n,0:3]
-
             '''
+
             ele_V2 = np.empty([3, 4], dtype=float)
             for local_i in range(3):
                 n = elems[e, local_i]
@@ -363,7 +352,7 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                         ele_V2[local_i, :] = ghost_nodes[n, 4:8]
                     else:
                         ele_V2[local_i, :] = ghost_nodes[n, 0:4]
-            '''
+
 
 
 
@@ -374,16 +363,16 @@ class Embedded_Explicit_Solver(Explicit_Solver):
             # Compute velocity gradients, temperature gradients, store in d_v
             #####################
 
-
+            '''
             vx1, vy1, T1 = ele_V[0, :]
             vx2, vy2, T2 = ele_V[1, :]
             vx3, vy3, T3 = ele_V[2, :]
-
             '''
+
             vx1, vy1, T1 = ele_V2[0, 1],ele_V2[0, 2], self.eos._compute_temperature(ele_V2[0,:])
             vx2, vy2, T2 = ele_V2[1, 1],ele_V2[1, 2], self.eos._compute_temperature(ele_V2[1,:])
             vx3, vy3, T3 = ele_V2[2, 1],ele_V2[2, 2], self.eos._compute_temperature(ele_V2[2,:])
-            '''
+
 
 
             vx, vy, T = (vx1 + vx2 + vx3) / 3.0, (vy1 + vy2 + vy3) / 3.0, (T1 + T2 + T3) / 3.0
@@ -442,10 +431,11 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                 R[n2, :] += e_area * d_shape[0, 1] * F_vis + e_area * d_shape[1, 1] * G_vis
             if status[n3]:
                 R[n3, :] += e_area * d_shape[0, 2] * F_vis + e_area * d_shape[1, 2] * G_vis
+            '''
             if(n1 == 1643 or n2 == 1643 or n3 == 1643):
                 print(ele_V)
                 print(n1, n2, n3,  'flux is',  e_area * d_shape[0, 0] * F_vis + e_area * d_shape[1, 0] * G_vis, e_area * d_shape[0, 1] * F_vis + e_area * d_shape[1, 1] * G_vis, e_area * d_shape[0, 2] * F_vis + e_area * d_shape[1, 2] * G_vis)
-
+            '''
 
 
 
@@ -480,14 +470,6 @@ class Embedded_Explicit_Solver(Explicit_Solver):
                 W[n, 3] = W[n, 0] * e_wall
                 W[m, 3] = W[m, 0] * e_wall
 
-    def _compute_local_time_step(self, V):
-
-        c = np.sqrt(self.eos.gamma * V[:, 3] / V[:, 0])
-        wave_speed = np.sqrt(V[:, 1] ** 2 + V[:, 2] ** 2) + c + self.eos.mu
-
-        dt = self.CFL * self.fluid_domain.min_edge / wave_speed[:, None]
-
-        return dt
 
 
 

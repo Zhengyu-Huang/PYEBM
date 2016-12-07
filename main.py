@@ -2,13 +2,13 @@
 #from Embedded_Explicit_Solver_New import *
 from Embedded_Explicit_Solver_Dante import *
 from Io_Data import *
-
 '''
 def main():
     # get input parameter
     # read fluid grid & construct fluid grid data
 
-    io_data = Io_Data("../Test/NacaBF/Visc/naca.input")
+    io_data = Io_Data("../Test/NacaBF/"
+                      "Invisc/naca.input")
     #io_data = Io_Data("../Test/Wedge/wedge.input")
     #io_data = Io_Data("../Test/EulerNaca/naca.input")
     fluid_input = io_data.fluidmesh
@@ -34,7 +34,6 @@ def main():
 
     # set_initial_solution
 '''
-
 def main():
     # get input parameter
     # read fluid grid & construct fluid grid data
@@ -55,7 +54,7 @@ def main():
 
     explicit_solver._solve()
     explicit_solver._draw_solution()
-    np.save("nacaW",explicit_solver.W)
+    np.save("nacaW1",explicit_solver.W)
 
     # if it is immersed boundary problem
 

@@ -60,10 +60,11 @@ class Structure:
             verts_norm[n2,:] += 0.5*edges_norm[i,:]
 
 
-    def _point_info(self,i,alpha):
+    def _point_info(self,i,alpha, x):
         #input:
         #     edge id :i
         #     local coordinate of point in the segment: x_p = x1 + alpha *(x2 - x1)
+        #     x: a point to determine the normal direction
         #return:
         #     point coordinate : x_p
         #     structure norm at x_p : norm_p
@@ -87,6 +88,9 @@ class Structure:
             norm_p = verts_norm[n2,:]
         else:# the point on the edge
             norm_p = edges_norm[i,:]
+
+        if (x[0]-x_p[0])*norm_p[0] + (x[1]-x_p[1])*norm_p[1] < 0:
+            norm_p = - norm_p
 
         return x_p, v_p, norm_p
 

@@ -377,7 +377,7 @@ def _Riemann_bWstar_FS(V,vv_wall,nn_wall,eos,equation_type):
     Args:
        V: fluid state primitive variables rho, u_x, u_y, p, at the wall, float[4]
        vv_wall: wall velocity, float[3]
-       nn_wall: woll outward normal, normal direction is away from fluid float[3]
+       nn_wall: woll outward normal, normal direction is toward  fluid float[3]
        eos: equation of state
        equation_type: Euler or NavierStokes
 
@@ -386,7 +386,7 @@ def _Riemann_bWstar_FS(V,vv_wall,nn_wall,eos,equation_type):
     """
 
 
-    nn_wall = nn_wall/np.linalg.norm(nn_wall)
+    nn_wall = -nn_wall/np.linalg.norm(nn_wall)
     gamma = eos.gamma;
     [rho, vx, vy, p] = V;
 
