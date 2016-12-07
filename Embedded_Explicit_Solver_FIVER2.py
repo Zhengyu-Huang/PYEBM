@@ -1,5 +1,5 @@
 from Limiter import *
-from Intersector import *
+from Intersector_FIVER2 import *
 import Utility
 import Flux
 from Embedded_Explicit_Solver_Base import Embedded_Explicit_Solver_Base
@@ -32,7 +32,7 @@ class Embedded_Explicit_Solver(Embedded_Explicit_Solver_Base):
 
         self.intersector = Intersector(self.fluid_domain, self.structure)
         #self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 8],dtype=float)
-        self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 6], dtype=float)
+        self.ghost_nodes = np.empty(shape=[self.fluid_domain.nverts, 3], dtype=float)
 
 
 
@@ -40,7 +40,7 @@ class Embedded_Explicit_Solver(Embedded_Explicit_Solver_Base):
 
 
 
-    def FIVER(self, V, i, n, limiter = None):
+    def FIVER(self, V, i, n, limiter = None, FIVER_order = 1):
         #  x1         xc  xb     x2
         #                  \
         #                   \
@@ -69,7 +69,7 @@ class Embedded_Explicit_Solver(Embedded_Explicit_Solver_Base):
 
         alpha_1, s_1, beta_1, alpha_2, s_2, beta_2 = self.intersector.intersect_result[i]
 
-        alpha, s, beta = alpha_1, s_1,beta_1 if n == n1 else alpha_2, s_2,beta_2
+        alpha, s, beta = (alpha_1, s_1,beta_1) if n == n1 else (alpha_2, s_2, beta_2)
 
 
 
@@ -90,28 +90,36 @@ class Embedded_Explicit_Solver(Embedded_Explicit_Solver_Base):
         v_bR = Flux._Riemann_bWstar_FS(v_b, vv_wall, nn_wall, eos, self.equation_type)
 
 
-        v_c = Utility._interpolation(x1, v, x_b, v_bR, x_c)
 
+        #The following two lines correspond to first order FIVER and second order FIVER
+        if(FIVER_order == 1):
+            v_c = v_bR                 # first order FIVER
+        else:
+            v_c = Utility._interpolation(x1, v, x_b, v_bR, x_c)   # second order FIVER
+
+
+        #print (v_c)
 
         return v_c
 
 
 
     def _fem_ghost_node_update(self, V):
-        # update ghost value of node n
+        # update ghost value of all nodes
         nverts = self.fluid_domain.nverts
+
         verts = self.fluid_domain.verts
 
         status = self.intersector.status
 
-
-
         intersect_or_not = self.intersector.intersect_or_not
 
         nedges = self.fluid_domain.nedges
+
         edges = self.fluid_domain.edges
 
         ghost_nodes = self.ghost_nodes
+
         ghost_nodes[:] = 0
 
         weight = np.zeros(nverts,dtype=int)
@@ -130,7 +138,6 @@ class Embedded_Explicit_Solver(Embedded_Explicit_Solver_Base):
 
             alpha_1, s_1, beta_1, alpha_2, s_2, beta_2 = self.intersector.intersect_result[i]
 
-
             if status[n]:
                 x_b = (1 - alpha_1) * xn + alpha_1 * xm
 
@@ -144,7 +151,7 @@ class Embedded_Explicit_Solver(Embedded_Explicit_Solver_Base):
 
                 u_wall = [vv_wall[0], vv_wall[1], T_wall]
 
-                ghost_nodes[m, 0:3] += Utility._interpolation(un, xn, x_b, u_wall, xm)
+                ghost_nodes[m, :] += Utility._interpolation(xn, un, x_b, u_wall, xm)
 
                 weight[m] += 1
 
@@ -161,7 +168,7 @@ class Embedded_Explicit_Solver(Embedded_Explicit_Solver_Base):
 
                 u_wall = [vv_wall[0], vv_wall[1], T_wall]
 
-                ghost_nodes[n, 0:3] += Utility._interpolation(um, xm, x_b, u_wall, xn)
+                ghost_nodes[n, :] += Utility._interpolation(xm, um, x_b, u_wall, xn)
 
                 weight[n] += 1
 
@@ -184,10 +191,9 @@ class Embedded_Explicit_Solver(Embedded_Explicit_Solver_Base):
         :return: u,v,T of the ghost node
         '''
 
-        if(opposite_side):
-            return self.ghost_nodes[n,3:6]
-        else:
-            return self.ghost_nodes[n, 0:3]
+
+        return self.ghost_nodes[n,:]
+
 
 
 
