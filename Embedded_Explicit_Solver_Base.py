@@ -138,7 +138,7 @@ class Embedded_Explicit_Solver_Base(Explicit_Solver):
 
                 if (m_active):
 
-                    v_R = v_m + 0.5 * dv_m #todo limiter
+                    v_R = v_m + 0.5 * dv_m  #todo limiter
 
                     v_L = self.FIVER(V, i, m, limiter)
 

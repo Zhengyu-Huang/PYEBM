@@ -1,6 +1,7 @@
 #  ##!/usr/bin/env python
 #from Embedded_Explicit_Solver_New import *
-from Embedded_Explicit_Solver_Dante import *
+from Embedded_Explicit_Solver_FIVER2 import *
+from Structure import Structure
 from Io_Data import *
 '''
 def main():
@@ -54,7 +55,7 @@ def main():
 
     explicit_solver._solve()
     explicit_solver._draw_solution()
-    np.save("nacaW1",explicit_solver.W)
+    np.save("nacaW_FIVER1_Euler",explicit_solver.W)
 
     # if it is immersed boundary problem
 
