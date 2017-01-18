@@ -1,7 +1,6 @@
 #  ##!/usr/bin/env python
 #from Embedded_Explicit_Solver_New import *
-from Embedded_Explicit_Solver_FIVER2 import *
-from Structure import Structure
+from Embedded_Explicit_Solver_Dante import *
 from Io_Data import *
 '''
 def main():

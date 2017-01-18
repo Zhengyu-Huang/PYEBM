@@ -9,7 +9,7 @@ class Limiter:
             if(a[i]*b[i]  < 0):
                 slope[i] = 0.0
             else:
-                slope[i] =  a[i]*(b[i]**2 + eps) + b[i]*(a[i]**2 + eps)/(a[i]**2 + b[i]**2 + 2*eps)
+                slope[i] =  (a[i]*(b[i]**2 + eps) + b[i]*(a[i]**2 + eps))/(a[i]**2 + b[i]**2 + 2*eps)
 
         return slope
     #  vn *------* vm
