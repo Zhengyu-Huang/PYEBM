@@ -1,4 +1,4 @@
-fluidmesh   /home/zhengyuh/Dropbox/IB_2D/Test/NacaBF/Visc/naca
+fluidmesh   ./Test/NacaBF/Visc/naca
 framework            body_fitted
 problem_type         steady
 equation_type        NS

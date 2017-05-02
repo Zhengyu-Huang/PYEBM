@@ -82,7 +82,7 @@ class Explicit_Solver:
 
         self._apply_wall_boundary_condition(W)
 
-        self.W = np.load("./nacaW_FIVER1_Euler.npy")
+
 
         #self.W = np.load("/home/zhengyuh/Dropbox/IB_2D/Test/NacaBF/Invisc/nacaW_inviscid1_dante.npy")
 

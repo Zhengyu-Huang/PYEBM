@@ -1,4 +1,4 @@
-fluidmesh   /home/zhengyuh/Dropbox/IB_2D/Test/Blasius/blasius.input
+fluidmesh   ./Test/Blasius/blasius_coarse
 framework            body_fitted
 problem_type         steady
 equation_type        NS
@@ -9,7 +9,7 @@ CFL      0.3
 gamma    1.4
 Prandtl  0.72
 Mach      0.5
-Reynolds  1000
+Reynolds  100
 AoA       0.0
 tolerance 1e-8
 max_ite 100
