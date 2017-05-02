@@ -1,0 +1,15 @@
+fluidmesh   /home/zhengyuh/Dropbox/IB_2D/Test/Blasius/blasius_coarse
+framework            body_fitted
+problem_type         steady
+equation_type        NS
+time_integration         explicit
+space_integration       RK2
+limiter   None1
+gamma    1.4
+Prandtl  0.72
+Mach      0.3
+Reynolds  1000
+AoA       0.0
+tolerance 1e-6
+max_ite 100
+

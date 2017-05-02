@@ -1,0 +1,17 @@
+fluidmesh   /home/zhengyuh/Dropbox/IB_2D/Test/IBNaca/domain
+structuremesh   /home/zhengyuh/Dropbox/IB_2D/Test/IBNaca/naca
+framework            embedded
+problem_type         steady
+equation_type        Euler
+time_integration         explicit
+space_integration       RK2
+limiter   None1
+gamma    1.4
+Prandtl  0.72
+CFL      0.3
+Mach      0.3
+Reynolds  100
+AoA       0.0
+tolerance 1e-6
+max_ite 10000
+
